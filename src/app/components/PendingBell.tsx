@@ -6,9 +6,11 @@ import type { Game } from "@/lib/types";
 export function PendingBell({
   pending,
   onDecided,
+  onSelectGame,
 }: {
   pending: Game[];
   onDecided: () => void;
+  onSelectGame: (game: Game) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -60,9 +62,13 @@ export function PendingBell({
             {pending.map((game) => {
               const type = game.status === "pending_add" ? "add" : "complete";
               return (
-                <div
+                <button
                   key={game.id}
-                  className="flex items-center gap-3 border-b border-neutral-800 p-3 last:border-b-0"
+                  onClick={() => {
+                    setOpen(false);
+                    onSelectGame(game);
+                  }}
+                  className="flex w-full items-center gap-3 border-b border-neutral-800 p-3 text-left last:border-b-0 hover:bg-neutral-800/60"
                 >
                   {game.headerImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -84,7 +90,10 @@ export function PendingBell({
                         : "als durchgespielt markieren"}
                     </p>
                   </div>
-                  <div className="flex shrink-0 gap-1">
+                  <div
+                    className="flex shrink-0 gap-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
                       onClick={() => decide(game, type, "approved")}
                       disabled={busyId === game.id}
@@ -100,7 +109,7 @@ export function PendingBell({
                       ✕
                     </button>
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>

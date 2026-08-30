@@ -133,7 +133,11 @@ export default function HomePage() {
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
       <header className="mb-6 flex flex-wrap items-center gap-3">
-        <PendingBell pending={pending} onDecided={refreshAll} />
+        <PendingBell
+          pending={pending}
+          onDecided={refreshAll}
+          onSelectGame={setSelectedGame}
+        />
         <h1 className="mr-auto text-lg font-semibold sm:text-xl">
           Spiele-Wunschliste
         </h1>
@@ -240,6 +244,7 @@ export default function HomePage() {
             setSelectedGame(null);
             refreshAll();
           }}
+          onChanged={refreshAll}
         />
       )}
 

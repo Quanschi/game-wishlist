@@ -8,11 +8,13 @@ export function GameDetailModal({
   currentUserId,
   onClose,
   onCompleteRequested,
+  onChanged,
 }: {
   game: Game;
   currentUserId: string;
   onClose: () => void;
   onCompleteRequested: () => void;
+  onChanged?: () => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +22,18 @@ export function GameDetailModal({
   const alreadyRequestedComplete = game.approvals.some(
     (a) => a.type === "complete" && a.userId === currentUserId
   );
+
+  const pendingType =
+    game.status === "pending_add"
+      ? "add"
+      : game.status === "pending_complete"
+        ? "complete"
+        : null;
+  const alreadyDecidedPending =
+    pendingType !== null &&
+    game.approvals.some(
+      (a) => a.type === pendingType && a.userId === currentUserId
+    );
 
   async function markComplete() {
     setBusy(true);
@@ -34,6 +48,46 @@ export function GameDetailModal({
         return;
       }
       onCompleteRequested();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reopen() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/games/${game.id}/reopen`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Fehlgeschlagen");
+        return;
+      }
+      onCompleteRequested();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function decidePending(decision: "approved" | "rejected") {
+    if (!pendingType) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/games/${game.id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: pendingType, decision }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Fehlgeschlagen");
+        return;
+      }
+      onChanged?.();
+      onClose();
     } finally {
       setBusy(false);
     }
@@ -75,6 +129,14 @@ export function GameDetailModal({
             </button>
           </div>
 
+          {pendingType && (
+            <div className="rounded-md bg-amber-950/40 border border-amber-800/50 px-3 py-2 text-sm text-amber-300">
+              {pendingType === "add"
+                ? `${game.requestedBy} möchte dieses Spiel zur Liste hinzufügen.`
+                : "Jemand hat vorgeschlagen, dieses Spiel als durchgespielt zu markieren."}
+            </div>
+          )}
+
           <div className="flex flex-wrap gap-2">
             {Array.from(new Set([...game.genres, ...game.categories])).map((tag) => (
               <span
@@ -108,6 +170,31 @@ export function GameDetailModal({
               </a>
             )}
 
+            {pendingType && !alreadyDecidedPending && (
+              <>
+                <button
+                  onClick={() => decidePending("approved")}
+                  disabled={busy}
+                  className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium hover:bg-green-500 disabled:opacity-50"
+                >
+                  Zustimmen
+                </button>
+                <button
+                  onClick={() => decidePending("rejected")}
+                  disabled={busy}
+                  className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium hover:bg-red-500 disabled:opacity-50"
+                >
+                  Ablehnen
+                </button>
+              </>
+            )}
+
+            {pendingType && alreadyDecidedPending && (
+              <span className="rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-300">
+                Du hast bereits zugestimmt, warte auf die zweite Person
+              </span>
+            )}
+
             {game.status === "active" && (
               <button
                 onClick={markComplete}
@@ -120,16 +207,19 @@ export function GameDetailModal({
               </button>
             )}
 
-            {game.status === "pending_complete" && (
-              <span className="rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-300">
-                Wartet auf Bestätigung, dass es durchgespielt ist
-              </span>
-            )}
-
             {game.status === "completed" && game.completedAt && (
-              <span className="rounded-md bg-green-900/50 px-4 py-2 text-sm text-green-300">
-                Durchgespielt am {game.completedAt}
-              </span>
+              <>
+                <span className="rounded-md bg-green-900/50 px-4 py-2 text-sm text-green-300">
+                  Durchgespielt am {game.completedAt}
+                </span>
+                <button
+                  onClick={reopen}
+                  disabled={busy}
+                  className="rounded-md bg-neutral-800 px-4 py-2 text-sm font-medium hover:bg-neutral-700 disabled:opacity-50"
+                >
+                  Zurück auf die Liste setzen
+                </button>
+              </>
             )}
           </div>
 

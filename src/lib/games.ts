@@ -254,6 +254,22 @@ export async function requestCompletion(
   await finalizeIfBothDecided(gameId, "complete");
 }
 
+export async function reopenGame(gameId: number): Promise<void> {
+  const db = await getDb();
+  const game = await getGameById(gameId);
+  if (!game || game.status !== "completed") {
+    throw new Error("Spiel ist nicht als durchgespielt markiert");
+  }
+  await db.execute({
+    sql: `UPDATE games SET status = 'active', completed_at = NULL WHERE id = ?`,
+    args: [gameId],
+  });
+  await db.execute({
+    sql: `DELETE FROM approvals WHERE game_id = ? AND type = 'complete'`,
+    args: [gameId],
+  });
+}
+
 export async function getRandomActiveGame(tag?: string): Promise<Game | null> {
   const games = await listGames({ statuses: ["active"], tag });
   if (games.length === 0) return null;
