@@ -22,6 +22,9 @@ export type Game = {
   categories: string[];
   releaseDate: string | null;
   price: string | null;
+  reviewScoreDesc: string | null;
+  reviewPositivePercent: number | null;
+  reviewTotal: number | null;
   status: GameStatus;
   requestedBy: string;
   requestedAt: string;
@@ -42,6 +45,9 @@ type GameRow = {
   categories: string;
   release_date: string | null;
   price: string | null;
+  review_score_desc: string | null;
+  review_positive_percent: number | null;
+  review_total: number | null;
   status: string;
   requested_by: string;
   requested_at: string;
@@ -67,6 +73,9 @@ async function rowToGame(row: GameRow): Promise<Game> {
     categories: JSON.parse(row.categories) as string[],
     releaseDate: row.release_date,
     price: row.price,
+    reviewScoreDesc: row.review_score_desc,
+    reviewPositivePercent: row.review_positive_percent,
+    reviewTotal: row.review_total,
     status: row.status as GameStatus,
     requestedBy: row.requested_by,
     requestedAt: row.requested_at,
@@ -97,8 +106,9 @@ export async function createGameRequest(
     sql: `INSERT INTO games (
       steam_appid, title, header_image, short_description, detailed_description,
       trailer_url, steam_url, genres, categories, release_date, price,
+      review_score_desc, review_positive_percent, review_total,
       status, requested_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_add', ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_add', ?)
     RETURNING id`,
     args: [
       details.appid,
@@ -112,6 +122,9 @@ export async function createGameRequest(
       JSON.stringify(details.categories),
       details.releaseDate,
       details.price,
+      details.reviews?.scoreDesc ?? null,
+      details.reviews?.positivePercent ?? null,
+      details.reviews?.totalReviews ?? null,
       requestedBy,
     ],
   });

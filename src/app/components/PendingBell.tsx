@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Game } from "@/lib/types";
+import { CheckIcon, XIcon } from "./icons";
 
 export function PendingBell({
   pending,
@@ -37,48 +38,56 @@ export function PendingBell({
     <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="relative rounded-md border border-neutral-700 p-2 hover:bg-neutral-800"
+        className="relative rounded-xl border border-neutral-800 bg-neutral-900/60 p-2.5 text-neutral-300 transition hover:border-neutral-700 hover:bg-neutral-800 hover:text-neutral-100"
         aria-label="Offene Anfragen"
       >
         <BellIcon />
         {pending.length > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold">
+          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[11px] font-bold text-white ring-2 ring-neutral-950">
             {pending.length}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute left-0 z-50 mt-2 w-80 rounded-lg border border-neutral-800 bg-neutral-900 shadow-xl">
-          <div className="border-b border-neutral-800 p-3 text-sm font-medium">
+        <div className="absolute left-0 z-50 mt-2 w-80 overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900 shadow-2xl shadow-black/50">
+          <div className="border-b border-neutral-800 px-3.5 py-3 text-sm font-semibold">
             Offene Anfragen
           </div>
           <div className="max-h-96 overflow-y-auto">
             {pending.length === 0 && (
-              <p className="p-3 text-sm text-neutral-400">
+              <p className="p-4 text-sm text-neutral-400">
                 Keine offenen Anfragen
               </p>
             )}
             {pending.map((game) => {
               const type = game.status === "pending_add" ? "add" : "complete";
               return (
-                <button
+                <div
                   key={game.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     setOpen(false);
                     onSelectGame(game);
                   }}
-                  className="flex w-full items-center gap-3 border-b border-neutral-800 p-3 text-left last:border-b-0 hover:bg-neutral-800/60"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      setOpen(false);
+                      onSelectGame(game);
+                    }
+                  }}
+                  className="flex w-full cursor-pointer items-center gap-3 border-b border-neutral-800/80 p-3 text-left transition last:border-b-0 hover:bg-neutral-800/50"
                 >
                   {game.headerImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={game.headerImage}
                       alt=""
-                      className="h-10 w-16 shrink-0 rounded object-cover"
+                      className="h-10 w-16 shrink-0 rounded-md object-cover"
                     />
                   ) : (
-                    <div className="h-10 w-16 shrink-0 rounded bg-neutral-800" />
+                    <div className="h-10 w-16 shrink-0 rounded-md bg-neutral-800" />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">
@@ -91,25 +100,27 @@ export function PendingBell({
                     </p>
                   </div>
                   <div
-                    className="flex shrink-0 gap-1"
+                    className="flex shrink-0 gap-1.5"
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button
                       onClick={() => decide(game, type, "approved")}
                       disabled={busyId === game.id}
-                      className="rounded-md bg-green-600 px-2 py-1 text-xs font-medium hover:bg-green-500 disabled:opacity-50"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-600 text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                      aria-label="Zustimmen"
                     >
-                      ✓
+                      <CheckIcon className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={() => decide(game, type, "rejected")}
                       disabled={busyId === game.id}
-                      className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium hover:bg-red-500 disabled:opacity-50"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-700 text-white transition hover:bg-rose-600 disabled:opacity-50"
+                      aria-label="Ablehnen"
                     >
-                      ✕
+                      <XIcon className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

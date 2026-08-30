@@ -7,6 +7,7 @@ import { GameTile } from "./components/GameTile";
 import { GameDetailModal } from "./components/GameDetailModal";
 import { AddGameModal } from "./components/AddGameModal";
 import { PendingBell } from "./components/PendingBell";
+import { SearchIcon } from "./components/icons";
 
 type SortKey = "newest" | "title-asc" | "title-desc" | "release";
 type Tab = "active" | "completed" | "mine";
@@ -149,68 +150,77 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
-      <header className="mb-6 flex flex-wrap items-center gap-3">
+      <header className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-neutral-800/80 bg-neutral-900/40 px-4 py-3 backdrop-blur-sm">
         <PendingBell
           pending={pending}
           onDecided={refreshAll}
           onSelectGame={setSelectedGame}
         />
-        <h1 className="mr-auto text-lg font-semibold sm:text-xl">
+        <h1 className="mr-auto text-lg font-semibold tracking-tight sm:text-xl">
           Spiele-Wunschliste
         </h1>
         <span className="text-sm text-neutral-400">Angemeldet als {userId}</span>
         <button
           onClick={logout}
-          className="rounded-md border border-neutral-700 px-3 py-1.5 text-sm hover:bg-neutral-800"
+          className="rounded-full border border-neutral-700 px-3.5 py-1.5 text-sm transition hover:border-neutral-600 hover:bg-neutral-800"
         >
           Abmelden
         </button>
       </header>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex rounded-md border border-neutral-700 p-0.5">
+      <div className="mb-4 mt-4 flex flex-wrap items-center gap-2">
+        <div className="flex rounded-full border border-neutral-800 bg-neutral-900/60 p-1">
           <button
             onClick={() => setTab("active")}
-            className={`rounded px-3 py-1.5 text-sm ${
-              tab === "active" ? "bg-neutral-700" : "hover:bg-neutral-800"
+            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+              tab === "active"
+                ? "bg-indigo-600 text-white"
+                : "text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
             }`}
           >
             Auf der Liste
           </button>
           <button
             onClick={() => setTab("completed")}
-            className={`rounded px-3 py-1.5 text-sm ${
-              tab === "completed" ? "bg-neutral-700" : "hover:bg-neutral-800"
+            className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+              tab === "completed"
+                ? "bg-indigo-600 text-white"
+                : "text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
             }`}
           >
             Durchgespielt
           </button>
           <button
             onClick={() => setTab("mine")}
-            className={`rounded px-3 py-1.5 text-sm ${
-              tab === "mine" ? "bg-neutral-700" : "hover:bg-neutral-800"
+            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+              tab === "mine"
+                ? "bg-indigo-600 text-white"
+                : "text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
             }`}
           >
             Warte auf Antwort
             {myRequests.length > 0 && (
-              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-neutral-900">
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-xs font-bold text-neutral-900">
                 {myRequests.length}
               </span>
             )}
           </button>
         </div>
 
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="In der Liste suchen…"
-          className="min-w-40 flex-1 rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm outline-none focus:border-neutral-500"
-        />
+        <div className="relative min-w-40 flex-1">
+          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="In der Liste suchen…"
+            className="w-full rounded-full border border-neutral-800 bg-neutral-900/60 py-1.5 pl-9 pr-3 text-sm outline-none transition focus:border-indigo-500"
+          />
+        </div>
 
         <select
           value={tag}
           onChange={(e) => setTag(e.target.value)}
-          className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm outline-none"
+          className="rounded-full border border-neutral-800 bg-neutral-900/60 px-3.5 py-1.5 text-sm outline-none transition focus:border-indigo-500"
         >
           <option value="">Alle Tags</option>
           {allTags.map((t) => (
@@ -223,7 +233,7 @@ export default function HomePage() {
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
-          className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-1.5 text-sm outline-none"
+          className="rounded-full border border-neutral-800 bg-neutral-900/60 px-3.5 py-1.5 text-sm outline-none transition focus:border-indigo-500"
         >
           <option value="newest">Neueste zuerst</option>
           <option value="title-asc">Titel A–Z</option>
@@ -234,7 +244,7 @@ export default function HomePage() {
         {tab === "active" && (
           <button
             onClick={pickRandom}
-            className="rounded-md bg-purple-600 px-3 py-1.5 text-sm font-medium hover:bg-purple-500"
+            className="rounded-full bg-violet-600 px-3.5 py-1.5 text-sm font-medium text-white transition hover:bg-violet-500"
           >
             🎲 Zufälliges Spiel
           </button>
@@ -242,7 +252,7 @@ export default function HomePage() {
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium hover:bg-blue-500"
+          className="rounded-full bg-indigo-600 px-3.5 py-1.5 text-sm font-medium text-white transition hover:bg-indigo-500"
         >
           + Spiel vorschlagen
         </button>

@@ -4,6 +4,12 @@ export type SteamSearchResult = {
   tinyImage: string | null;
 };
 
+export type SteamReviewSummary = {
+  scoreDesc: string;
+  positivePercent: number;
+  totalReviews: number;
+};
+
 export type SteamGameDetails = {
   appid: number;
   title: string;
@@ -17,9 +23,62 @@ export type SteamGameDetails = {
   releaseDate: string | null;
   price: string | null;
   screenshots: string[];
+  reviews: SteamReviewSummary | null;
 };
 
 const STORE_API = "https://store.steampowered.com/api";
+
+const REVIEW_SCORE_DESC_DE: Record<string, string> = {
+  "Overwhelmingly Positive": "Überwältigend positiv",
+  "Very Positive": "Sehr positiv",
+  Positive: "Positiv",
+  "Mostly Positive": "Größtenteils positiv",
+  Mixed: "Ausgeglichen",
+  "Mostly Negative": "Größtenteils negativ",
+  Negative: "Negativ",
+  "Very Negative": "Sehr negativ",
+  "Overwhelmingly Negative": "Überwältigend negativ",
+  "No user reviews": "Keine Bewertungen",
+  "1 user reviews": "Zu wenige Bewertungen",
+  "2 user reviews": "Zu wenige Bewertungen",
+  "3 user reviews": "Zu wenige Bewertungen",
+  "4 user reviews": "Zu wenige Bewertungen",
+  "5 user reviews": "Zu wenige Bewertungen",
+  "6 user reviews": "Zu wenige Bewertungen",
+  "7 user reviews": "Zu wenige Bewertungen",
+  "8 user reviews": "Zu wenige Bewertungen",
+  "9 user reviews": "Zu wenige Bewertungen",
+};
+
+export async function getSteamReviewSummary(
+  appId: number
+): Promise<SteamReviewSummary | null> {
+  const url = `https://store.steampowered.com/appreviews/${appId}?json=1&language=all&purchase_type=all&num_per_page=0`;
+  try {
+    const res = await fetch(url, { next: { revalidate: 0 } });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      success?: number;
+      query_summary?: {
+        review_score_desc?: string;
+        total_positive?: number;
+        total_reviews?: number;
+      };
+    };
+    const summary = data.query_summary;
+    if (!data.success || !summary || !summary.total_reviews) return null;
+    const totalReviews = summary.total_reviews;
+    const totalPositive = summary.total_positive ?? 0;
+    const rawDesc = summary.review_score_desc ?? "";
+    return {
+      scoreDesc: REVIEW_SCORE_DESC_DE[rawDesc] ?? rawDesc,
+      positivePercent: Math.round((totalPositive / totalReviews) * 100),
+      totalReviews,
+    };
+  } catch {
+    return null;
+  }
+}
 
 function extractAppId(input: string): number | null {
   const trimmed = input.trim();
@@ -101,6 +160,8 @@ export async function getSteamAppDetails(
     firstMovie?.webm?.["480"] ??
     null;
 
+  const reviews = await getSteamReviewSummary(appId);
+
   return {
     appid: appId,
     title: d.name,
@@ -116,5 +177,6 @@ export async function getSteamAppDetails(
       ? "Kostenlos"
       : (d.price_overview?.final_formatted ?? null),
     screenshots: (d.screenshots ?? []).map((s) => s.path_full),
+    reviews,
   };
 }

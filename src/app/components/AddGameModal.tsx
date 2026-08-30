@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { SearchIcon } from "./icons";
 
 type SearchResult = {
   appid: number;
@@ -68,21 +69,24 @@ export function AddGameModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 pt-20"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 pt-20 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="max-h-[75vh] w-full max-w-lg overflow-hidden rounded-xl border border-neutral-800 bg-neutral-900"
+        className="max-h-[75vh] w-full max-w-lg overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl shadow-black/60"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="border-b border-neutral-800 p-4">
-          <input
-            autoFocus
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Spieltitel oder Steam-Link eingeben…"
-            className="w-full rounded-md border border-neutral-700 bg-neutral-800 px-3 py-2 outline-none focus:border-neutral-500"
-          />
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Spieltitel oder Steam-Link eingeben…"
+              className="w-full rounded-full border border-neutral-700 bg-neutral-800 py-2 pl-10 pr-3 outline-none transition focus:border-indigo-500"
+            />
+          </div>
         </div>
         <div className="max-h-[55vh] overflow-y-auto p-2">
           {loading && (
@@ -97,20 +101,20 @@ export function AddGameModal({
               key={r.appid}
               onClick={() => requestGame(r.appid)}
               disabled={requestingId !== null}
-              className="flex w-full items-center gap-3 rounded-md p-2 text-left hover:bg-neutral-800 disabled:opacity-50"
+              className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-neutral-800 disabled:opacity-50"
             >
               {r.tinyImage ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={r.tinyImage}
                   alt=""
-                  className="h-10 w-20 shrink-0 rounded object-cover"
+                  className="h-10 w-20 shrink-0 rounded-lg object-cover"
                 />
               ) : (
-                <div className="h-10 w-20 shrink-0 rounded bg-neutral-800" />
+                <div className="h-10 w-20 shrink-0 rounded-lg bg-neutral-800" />
               )}
               <span className="flex-1 truncate">{r.name}</span>
-              <span className="shrink-0 text-xs text-neutral-400">
+              <span className="shrink-0 rounded-full bg-neutral-800 px-2.5 py-1 text-xs text-neutral-300">
                 {requestingId === r.appid
                   ? "Wird vorgeschlagen…"
                   : "Vorschlagen"}

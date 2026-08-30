@@ -2,6 +2,22 @@
 
 import { useState } from "react";
 import type { Game } from "@/lib/types";
+import { CheckIcon, ChevronDownIcon, XIcon } from "./icons";
+
+const MAIN_TAG_COUNT = 3;
+
+function reviewTone(percent: number | null): "positive" | "mixed" | "negative" {
+  if (percent === null) return "mixed";
+  if (percent >= 70) return "positive";
+  if (percent >= 40) return "mixed";
+  return "negative";
+}
+
+const reviewToneClasses: Record<string, string> = {
+  positive: "bg-emerald-950/50 text-emerald-300 border-emerald-800/60",
+  mixed: "bg-amber-950/50 text-amber-300 border-amber-800/60",
+  negative: "bg-rose-950/50 text-rose-300 border-rose-800/60",
+};
 
 export function GameDetailModal({
   game,
@@ -18,6 +34,7 @@ export function GameDetailModal({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
 
   const alreadyRequestedComplete = game.approvals.some(
     (a) => a.type === "complete" && a.userId === currentUserId
@@ -34,6 +51,10 @@ export function GameDetailModal({
     game.approvals.some(
       (a) => a.type === pendingType && a.userId === currentUserId
     );
+
+  const allTags = Array.from(new Set([...game.genres, ...game.categories]));
+  const mainTags = allTags.slice(0, MAIN_TAG_COUNT);
+  const restTags = allTags.slice(MAIN_TAG_COUNT);
 
   async function markComplete() {
     setBusy(true);
@@ -95,61 +116,87 @@ export function GameDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-neutral-800 bg-neutral-900"
+        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-neutral-800 bg-neutral-900 shadow-2xl shadow-black/60"
         onClick={(e) => e.stopPropagation()}
       >
-        {game.trailerUrl ? (
-          <video
-            src={game.trailerUrl}
-            poster={game.headerImage ?? undefined}
-            controls
-            className="aspect-video w-full bg-black"
-          />
-        ) : game.headerImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={game.headerImage}
-            alt={game.title}
-            className="aspect-video w-full object-cover"
-          />
-        ) : null}
+        <div className="relative">
+          {game.trailerUrl ? (
+            <video
+              src={game.trailerUrl}
+              poster={game.headerImage ?? undefined}
+              controls
+              className="aspect-video w-full bg-black"
+            />
+          ) : game.headerImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={game.headerImage}
+              alt={game.title}
+              className="aspect-video w-full object-cover"
+            />
+          ) : null}
+          <button
+            onClick={onClose}
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition hover:bg-black/80"
+            aria-label="Schließen"
+          >
+            <XIcon className="h-4 w-4" />
+          </button>
+        </div>
 
         <div className="space-y-4 p-6">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <h2 className="text-xl font-semibold">{game.title}</h2>
-            <button
-              onClick={onClose}
-              className="shrink-0 rounded-md border border-neutral-700 px-2 py-1 text-sm text-neutral-400 hover:text-neutral-100"
-            >
-              Schließen
-            </button>
+            {game.reviewPositivePercent !== null && (
+              <span
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium ${reviewToneClasses[reviewTone(game.reviewPositivePercent)]}`}
+              >
+                {game.reviewScoreDesc ?? `${game.reviewPositivePercent}% positiv`}
+                {game.reviewTotal ? ` · ${game.reviewTotal.toLocaleString("de-DE")} Bewertungen` : ""}
+              </span>
+            )}
           </div>
 
           {pendingType && (
-            <div className="rounded-md bg-amber-950/40 border border-amber-800/50 px-3 py-2 text-sm text-amber-300">
+            <div className="rounded-lg border border-amber-800/50 bg-amber-950/40 px-3.5 py-2.5 text-sm text-amber-300">
               {pendingType === "add"
                 ? `${game.requestedBy} möchte dieses Spiel zur Liste hinzufügen.`
                 : "Jemand hat vorgeschlagen, dieses Spiel als durchgespielt zu markieren."}
             </div>
           )}
 
-          <div className="flex flex-wrap gap-2">
-            {Array.from(new Set([...game.genres, ...game.categories])).map((tag) => (
-              <span
-                key={tag}
-                className="rounded-full bg-neutral-800 px-2.5 py-1 text-xs text-neutral-300"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-
           {game.shortDescription && (
-            <p className="text-sm text-neutral-300">{game.shortDescription}</p>
+            <p className="text-sm leading-relaxed text-neutral-300">
+              {game.shortDescription}
+            </p>
+          )}
+
+          {allTags.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {(tagsExpanded ? allTags : mainTags).map((tag) => (
+                <span
+                  key={tag}
+                  className="rounded-full bg-neutral-800/80 px-2.5 py-1 text-xs text-neutral-300"
+                >
+                  {tag}
+                </span>
+              ))}
+              {restTags.length > 0 && (
+                <button
+                  onClick={() => setTagsExpanded((v) => !v)}
+                  className="flex items-center gap-1 rounded-full border border-neutral-700 px-2.5 py-1 text-xs text-neutral-400 transition hover:border-neutral-600 hover:text-neutral-200"
+                >
+                  {tagsExpanded ? "Weniger" : `Tags +${restTags.length}`}
+                  <ChevronDownIcon
+                    className={`h-3 w-3 transition-transform ${tagsExpanded ? "rotate-180" : ""}`}
+                  />
+                </button>
+              )}
+            </div>
           )}
 
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-neutral-400">
@@ -158,13 +205,13 @@ export function GameDetailModal({
             <span>Vorgeschlagen von: {game.requestedBy}</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 pt-2">
+          <div className="flex flex-wrap items-center gap-2.5 pt-2">
             {game.steamUrl && (
               <a
                 href={game.steamUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="rounded-md bg-neutral-800 px-4 py-2 text-sm font-medium hover:bg-neutral-700"
+                className="rounded-full bg-neutral-800 px-4 py-2 text-sm font-medium transition hover:bg-neutral-700"
               >
                 Auf Steam ansehen
               </a>
@@ -175,22 +222,24 @@ export function GameDetailModal({
                 <button
                   onClick={() => decidePending("approved")}
                   disabled={busy}
-                  className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium hover:bg-green-500 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
                 >
+                  <CheckIcon className="h-3.5 w-3.5" />
                   Zustimmen
                 </button>
                 <button
                   onClick={() => decidePending("rejected")}
                   disabled={busy}
-                  className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium hover:bg-red-500 disabled:opacity-50"
+                  className="flex items-center gap-1.5 rounded-full bg-neutral-800 px-4 py-2 text-sm font-medium transition hover:bg-rose-600 disabled:opacity-50"
                 >
+                  <XIcon className="h-3.5 w-3.5" />
                   Ablehnen
                 </button>
               </>
             )}
 
             {pendingType && alreadyDecidedPending && (
-              <span className="rounded-md bg-neutral-800 px-4 py-2 text-sm text-neutral-300">
+              <span className="rounded-full bg-neutral-800 px-4 py-2 text-sm text-neutral-300">
                 Du hast bereits zugestimmt, warte auf die zweite Person
               </span>
             )}
@@ -199,23 +248,28 @@ export function GameDetailModal({
               <button
                 onClick={markComplete}
                 disabled={busy || alreadyRequestedComplete}
-                className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium hover:bg-green-500 disabled:opacity-50"
+                className="flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
               >
-                {alreadyRequestedComplete
-                  ? "Warte auf Zustimmung…"
-                  : "Als durchgespielt markieren"}
+                {alreadyRequestedComplete ? (
+                  "Warte auf Zustimmung…"
+                ) : (
+                  <>
+                    <CheckIcon className="h-3.5 w-3.5" />
+                    Als durchgespielt markieren
+                  </>
+                )}
               </button>
             )}
 
             {game.status === "completed" && game.completedAt && (
               <>
-                <span className="rounded-md bg-green-900/50 px-4 py-2 text-sm text-green-300">
+                <span className="rounded-full bg-emerald-950/50 px-4 py-2 text-sm text-emerald-300">
                   Durchgespielt am {game.completedAt}
                 </span>
                 <button
                   onClick={reopen}
                   disabled={busy}
-                  className="rounded-md bg-neutral-800 px-4 py-2 text-sm font-medium hover:bg-neutral-700 disabled:opacity-50"
+                  className="rounded-full bg-neutral-800 px-4 py-2 text-sm font-medium transition hover:bg-neutral-700 disabled:opacity-50"
                 >
                   Zurück auf die Liste setzen
                 </button>

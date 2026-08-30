@@ -52,6 +52,19 @@ async function migrate(db: Client) {
   await db.execute(
     `CREATE INDEX IF NOT EXISTS idx_approvals_game ON approvals(game_id, type)`
   );
+
+  const columns = await db.execute(`PRAGMA table_info(games)`);
+  const existing = new Set(columns.rows.map((r) => r.name as string));
+  const reviewColumns: [string, string][] = [
+    ["review_score_desc", "TEXT"],
+    ["review_positive_percent", "INTEGER"],
+    ["review_total", "INTEGER"],
+  ];
+  for (const [name, type] of reviewColumns) {
+    if (!existing.has(name)) {
+      await db.execute(`ALTER TABLE games ADD COLUMN ${name} ${type}`);
+    }
+  }
 }
 
 export async function getDb(): Promise<Client> {
