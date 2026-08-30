@@ -103,16 +103,16 @@ export function AddGameModal({
               disabled={requestingId !== null}
               className="flex w-full items-center gap-3 rounded-xl p-2 text-left transition hover:bg-neutral-800 disabled:opacity-50"
             >
-              {r.tinyImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={r.tinyImage}
-                  alt=""
-                  className="h-10 w-20 shrink-0 rounded-lg object-cover"
-                />
-              ) : (
-                <div className="h-10 w-20 shrink-0 rounded-lg bg-neutral-800" />
-              )}
+              <div className="flex h-10 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-800">
+                {r.tinyImage && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={r.tinyImage}
+                    alt=""
+                    className="h-full w-full object-contain"
+                  />
+                )}
+              </div>
               <span className="flex-1 truncate">{r.name}</span>
               <span className="shrink-0 rounded-full bg-neutral-800 px-2.5 py-1 text-xs text-neutral-300">
                 {requestingId === r.appid

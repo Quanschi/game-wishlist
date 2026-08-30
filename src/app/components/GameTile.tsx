@@ -21,13 +21,13 @@ export function GameTile({
           : "border-neutral-800 hover:border-neutral-700"
       } bg-neutral-900`}
     >
-      <div className="relative aspect-video w-full overflow-hidden bg-neutral-800">
+      <div className="relative aspect-[460/215] w-full overflow-hidden bg-neutral-800">
         {game.headerImage ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={game.headerImage}
             alt={game.title}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            className="h-full w-full object-contain transition duration-300 group-hover:scale-105"
           />
         ) : null}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/50 to-transparent" />
@@ -59,6 +59,11 @@ export function GameTile({
       {game.status === "pending_complete" && (
         <span className="absolute right-2 top-2 rounded-full bg-amber-600/90 px-2 py-0.5 text-xs font-medium">
           Durchspielen wartet
+        </span>
+      )}
+      {game.status === "pending_remove" && (
+        <span className="absolute right-2 top-2 rounded-full bg-rose-600/90 px-2 py-0.5 text-xs font-medium">
+          Entfernen wartet
         </span>
       )}
       {highlight && (

@@ -7,7 +7,17 @@ export type GameStatus =
   | "active"
   | "pending_complete"
   | "completed"
+  | "pending_remove"
   | "rejected";
+
+type ApprovalType = "add" | "complete" | "remove";
+
+function pendingTypeOf(status: GameStatus): ApprovalType | null {
+  if (status === "pending_add") return "add";
+  if (status === "pending_complete") return "complete";
+  if (status === "pending_remove") return "remove";
+  return null;
+}
 
 export type Game = {
   id: number;
@@ -179,38 +189,36 @@ export async function listGames(filter: {
 export async function listPendingForUser(userId: string): Promise<Game[]> {
   const db = await getDb();
   const res = await db.execute({
-    sql: `SELECT * FROM games WHERE status IN ('pending_add','pending_complete')`,
+    sql: `SELECT * FROM games WHERE status IN ('pending_add','pending_complete','pending_remove')`,
     args: [],
   });
   const games = await Promise.all(
     res.rows.map((r) => rowToGame(r as unknown as GameRow))
   );
-  const pendingType = (g: Game) =>
-    g.status === "pending_add" ? "add" : "complete";
-  return games.filter(
-    (g) => !g.approvals.some((a) => a.type === pendingType(g) && a.userId === userId)
-  );
+  return games.filter((g) => {
+    const type = pendingTypeOf(g.status);
+    return type && !g.approvals.some((a) => a.type === type && a.userId === userId);
+  });
 }
 
 export async function listMyOpenRequests(userId: string): Promise<Game[]> {
   const db = await getDb();
   const res = await db.execute({
-    sql: `SELECT * FROM games WHERE status IN ('pending_add','pending_complete')`,
+    sql: `SELECT * FROM games WHERE status IN ('pending_add','pending_complete','pending_remove')`,
     args: [],
   });
   const games = await Promise.all(
     res.rows.map((r) => rowToGame(r as unknown as GameRow))
   );
-  const pendingType = (g: Game) =>
-    g.status === "pending_add" ? "add" : "complete";
-  return games.filter((g) =>
-    g.approvals.some((a) => a.type === pendingType(g) && a.userId === userId)
-  );
+  return games.filter((g) => {
+    const type = pendingTypeOf(g.status);
+    return type && g.approvals.some((a) => a.type === type && a.userId === userId);
+  });
 }
 
 async function finalizeIfBothDecided(
   gameId: number,
-  type: "add" | "complete"
+  type: ApprovalType
 ): Promise<void> {
   const game = await getGameById(gameId);
   if (!game) return;
@@ -219,10 +227,21 @@ async function finalizeIfBothDecided(
 
   const db = await getDb();
   const anyRejected = decisions.some((d) => d.decision === "rejected");
-  if (anyRejected) {
-    if (type === "add") {
+
+  if (type === "add") {
+    if (anyRejected) {
       await db.execute({ sql: `DELETE FROM games WHERE id = ?`, args: [gameId] });
     } else {
+      await db.execute({
+        sql: `UPDATE games SET status = 'active' WHERE id = ?`,
+        args: [gameId],
+      });
+    }
+    return;
+  }
+
+  if (type === "complete") {
+    if (anyRejected) {
       await db.execute({
         sql: `UPDATE games SET status = 'active' WHERE id = ?`,
         args: [gameId],
@@ -231,26 +250,39 @@ async function finalizeIfBothDecided(
         sql: `DELETE FROM approvals WHERE game_id = ? AND type = 'complete'`,
         args: [gameId],
       });
+    } else {
+      await db.execute({
+        sql: `UPDATE games SET status = 'completed', completed_at = datetime('now') WHERE id = ?`,
+        args: [gameId],
+      });
     }
     return;
   }
 
-  if (type === "add") {
+  // type === "remove"
+  if (anyRejected) {
+    const row = await db.execute({
+      sql: `SELECT pre_remove_status FROM games WHERE id = ?`,
+      args: [gameId],
+    });
+    const preStatus =
+      (row.rows[0]?.pre_remove_status as string | null) ?? "active";
     await db.execute({
-      sql: `UPDATE games SET status = 'active' WHERE id = ?`,
+      sql: `UPDATE games SET status = ?, pre_remove_status = NULL WHERE id = ?`,
+      args: [preStatus, gameId],
+    });
+    await db.execute({
+      sql: `DELETE FROM approvals WHERE game_id = ? AND type = 'remove'`,
       args: [gameId],
     });
   } else {
-    await db.execute({
-      sql: `UPDATE games SET status = 'completed', completed_at = datetime('now') WHERE id = ?`,
-      args: [gameId],
-    });
+    await db.execute({ sql: `DELETE FROM games WHERE id = ?`, args: [gameId] });
   }
 }
 
 export async function decide(
   gameId: number,
-  type: "add" | "complete",
+  type: ApprovalType,
   userId: string,
   decision: "approved" | "rejected"
 ): Promise<void> {
@@ -281,6 +313,26 @@ export async function requestCompletion(
     args: [gameId, userId],
   });
   await finalizeIfBothDecided(gameId, "complete");
+}
+
+export async function requestRemoval(
+  gameId: number,
+  userId: string
+): Promise<void> {
+  const db = await getDb();
+  const game = await getGameById(gameId);
+  if (!game || (game.status !== "active" && game.status !== "completed")) {
+    throw new Error("Spiel kann gerade nicht entfernt werden");
+  }
+  await db.execute({
+    sql: `UPDATE games SET status = 'pending_remove', pre_remove_status = ? WHERE id = ?`,
+    args: [game.status, gameId],
+  });
+  await db.execute({
+    sql: `INSERT INTO approvals (game_id, type, user_id, decision) VALUES (?, 'remove', ?, 'approved')`,
+    args: [gameId, userId],
+  });
+  await finalizeIfBothDecided(gameId, "remove");
 }
 
 export async function reopenGame(gameId: number): Promise<void> {

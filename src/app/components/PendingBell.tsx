@@ -18,7 +18,7 @@ export function PendingBell({
 
   async function decide(
     game: Game,
-    type: "add" | "complete",
+    type: "add" | "complete" | "remove",
     decision: "approved" | "rejected"
   ) {
     setBusyId(game.id);
@@ -61,7 +61,12 @@ export function PendingBell({
               </p>
             )}
             {pending.map((game) => {
-              const type = game.status === "pending_add" ? "add" : "complete";
+              const type =
+                game.status === "pending_add"
+                  ? "add"
+                  : game.status === "pending_remove"
+                    ? "remove"
+                    : "complete";
               return (
                 <div
                   key={game.id}
@@ -79,24 +84,25 @@ export function PendingBell({
                   }}
                   className="flex w-full cursor-pointer items-center gap-3 border-b border-neutral-800/80 p-3 text-left transition last:border-b-0 hover:bg-neutral-800/50"
                 >
-                  {game.headerImage ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={game.headerImage}
-                      alt=""
-                      className="h-10 w-16 shrink-0 rounded-md object-cover"
-                    />
-                  ) : (
-                    <div className="h-10 w-16 shrink-0 rounded-md bg-neutral-800" />
-                  )}
+                  <div className="flex h-10 w-16 shrink-0 items-center justify-center overflow-hidden rounded-md bg-neutral-800">
+                    {game.headerImage && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={game.headerImage}
+                        alt=""
+                        className="h-full w-full object-contain"
+                      />
+                    )}
+                  </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">
                       {game.title}
                     </p>
                     <p className="truncate text-xs text-neutral-400">
-                      {type === "add"
-                        ? `${game.requestedBy} möchte hinzufügen`
-                        : "als durchgespielt markieren"}
+                      {type === "add" &&
+                        `${game.requestedBy} möchte hinzufügen`}
+                      {type === "complete" && "als durchgespielt markieren"}
+                      {type === "remove" && "von der Liste entfernen"}
                     </p>
                   </div>
                   <div
@@ -114,7 +120,7 @@ export function PendingBell({
                     <button
                       onClick={() => decide(game, type, "rejected")}
                       disabled={busyId === game.id}
-                      className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-700 text-white transition hover:bg-rose-600 disabled:opacity-50"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-rose-600 text-white transition hover:bg-rose-500 disabled:opacity-50"
                       aria-label="Ablehnen"
                     >
                       <XIcon className="h-3.5 w-3.5" />

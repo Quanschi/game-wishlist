@@ -150,7 +150,7 @@ export default function HomePage() {
 
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 p-4 sm:p-6">
-      <header className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-neutral-800/80 bg-neutral-900/40 px-4 py-3 backdrop-blur-sm">
+      <header className="relative z-20 mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-neutral-800/80 bg-neutral-900/40 px-4 py-3 backdrop-blur-sm">
         <PendingBell
           pending={pending}
           onDecided={refreshAll}

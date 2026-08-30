@@ -39,13 +39,18 @@ export function GameDetailModal({
   const alreadyRequestedComplete = game.approvals.some(
     (a) => a.type === "complete" && a.userId === currentUserId
   );
+  const alreadyRequestedRemove = game.approvals.some(
+    (a) => a.type === "remove" && a.userId === currentUserId
+  );
 
   const pendingType =
     game.status === "pending_add"
       ? "add"
       : game.status === "pending_complete"
         ? "complete"
-        : null;
+        : game.status === "pending_remove"
+          ? "remove"
+          : null;
   const alreadyDecidedPending =
     pendingType !== null &&
     game.approvals.some(
@@ -61,6 +66,24 @@ export function GameDetailModal({
     setError(null);
     try {
       const res = await fetch(`/api/games/${game.id}/complete`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Fehlgeschlagen");
+        return;
+      }
+      onCompleteRequested();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function requestRemove() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/games/${game.id}/remove`, {
         method: "POST",
       });
       if (!res.ok) {
@@ -129,14 +152,14 @@ export function GameDetailModal({
               src={game.trailerUrl}
               poster={game.headerImage ?? undefined}
               controls
-              className="aspect-video w-full bg-black"
+              className="aspect-video w-full bg-black object-contain"
             />
           ) : game.headerImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={game.headerImage}
               alt={game.title}
-              className="aspect-video w-full object-cover"
+              className="aspect-[460/215] w-full bg-black object-contain"
             />
           ) : null}
           <button
@@ -162,10 +185,19 @@ export function GameDetailModal({
           </div>
 
           {pendingType && (
-            <div className="rounded-lg border border-amber-800/50 bg-amber-950/40 px-3.5 py-2.5 text-sm text-amber-300">
-              {pendingType === "add"
-                ? `${game.requestedBy} möchte dieses Spiel zur Liste hinzufügen.`
-                : "Jemand hat vorgeschlagen, dieses Spiel als durchgespielt zu markieren."}
+            <div
+              className={`rounded-lg border px-3.5 py-2.5 text-sm ${
+                pendingType === "remove"
+                  ? "border-rose-800/50 bg-rose-950/40 text-rose-300"
+                  : "border-amber-800/50 bg-amber-950/40 text-amber-300"
+              }`}
+            >
+              {pendingType === "add" &&
+                `${game.requestedBy} möchte dieses Spiel zur Liste hinzufügen.`}
+              {pendingType === "complete" &&
+                "Jemand hat vorgeschlagen, dieses Spiel als durchgespielt zu markieren."}
+              {pendingType === "remove" &&
+                "Jemand möchte dieses Spiel von der Liste entfernen."}
             </div>
           )}
 
@@ -222,7 +254,11 @@ export function GameDetailModal({
                 <button
                   onClick={() => decidePending("approved")}
                   disabled={busy}
-                  className="flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-500 disabled:opacity-50"
+                  className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-white transition disabled:opacity-50 ${
+                    pendingType === "remove"
+                      ? "bg-rose-600 hover:bg-rose-500"
+                      : "bg-emerald-600 hover:bg-emerald-500"
+                  }`}
                 >
                   <CheckIcon className="h-3.5 w-3.5" />
                   Zustimmen
@@ -274,6 +310,18 @@ export function GameDetailModal({
                   Zurück auf die Liste setzen
                 </button>
               </>
+            )}
+
+            {(game.status === "active" || game.status === "completed") && (
+              <button
+                onClick={requestRemove}
+                disabled={busy || alreadyRequestedRemove}
+                className="flex items-center gap-1.5 rounded-full border border-rose-900/60 bg-transparent px-4 py-2 text-sm font-medium text-rose-400 transition hover:bg-rose-950/40 disabled:opacity-50"
+              >
+                {alreadyRequestedRemove
+                  ? "Entfernen wartet auf Zustimmung…"
+                  : "Von der Liste entfernen"}
+              </button>
             )}
           </div>
 
