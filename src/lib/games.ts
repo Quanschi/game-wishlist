@@ -179,6 +179,22 @@ export async function listPendingForUser(userId: string): Promise<Game[]> {
   );
 }
 
+export async function listMyOpenRequests(userId: string): Promise<Game[]> {
+  const db = await getDb();
+  const res = await db.execute({
+    sql: `SELECT * FROM games WHERE status IN ('pending_add','pending_complete')`,
+    args: [],
+  });
+  const games = await Promise.all(
+    res.rows.map((r) => rowToGame(r as unknown as GameRow))
+  );
+  const pendingType = (g: Game) =>
+    g.status === "pending_add" ? "add" : "complete";
+  return games.filter((g) =>
+    g.approvals.some((a) => a.type === pendingType(g) && a.userId === userId)
+  );
+}
+
 async function finalizeIfBothDecided(
   gameId: number,
   type: "add" | "complete"

@@ -9,13 +9,14 @@ import { AddGameModal } from "./components/AddGameModal";
 import { PendingBell } from "./components/PendingBell";
 
 type SortKey = "newest" | "title-asc" | "title-desc" | "release";
-type Tab = "active" | "completed";
+type Tab = "active" | "completed" | "mine";
 
 export default function HomePage() {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [games, setGames] = useState<Game[]>([]);
   const [pending, setPending] = useState<Game[]>([]);
+  const [myRequests, setMyRequests] = useState<Game[]>([]);
   const [tab, setTab] = useState<Tab>("active");
   const [search, setSearch] = useState("");
   const [tag, setTag] = useState("");
@@ -26,6 +27,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
 
   const loadGames = useCallback(async (view: Tab) => {
+    if (view === "mine") return;
     const res = await fetch(`/api/games?view=${view}`);
     if (res.status === 401) {
       router.push("/login");
@@ -40,6 +42,14 @@ export default function HomePage() {
     if (res.ok) {
       const data = await res.json();
       setPending(data.games ?? []);
+    }
+  }, []);
+
+  const loadMyRequests = useCallback(async () => {
+    const res = await fetch("/api/games/mine-pending");
+    if (res.ok) {
+      const data = await res.json();
+      setMyRequests(data.games ?? []);
     }
   }, []);
 
@@ -62,30 +72,37 @@ export default function HomePage() {
 
   useEffect(() => {
     loadPending();
-    const interval = setInterval(loadPending, 8000);
+    loadMyRequests();
+    const interval = setInterval(() => {
+      loadPending();
+      loadMyRequests();
+    }, 8000);
     return () => clearInterval(interval);
-  }, [loadPending]);
+  }, [loadPending, loadMyRequests]);
 
   const refreshAll = useCallback(() => {
     loadGames(tab);
     loadPending();
-  }, [loadGames, loadPending, tab]);
+    loadMyRequests();
+  }, [loadGames, loadPending, loadMyRequests, tab]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   }
 
+  const displayGames = tab === "mine" ? myRequests : games;
+
   const allTags = useMemo(() => {
     const set = new Set<string>();
-    for (const g of games) {
+    for (const g of displayGames) {
       for (const t of [...g.genres, ...g.categories]) set.add(t);
     }
     return Array.from(set).sort();
-  }, [games]);
+  }, [displayGames]);
 
   const filteredGames = useMemo(() => {
-    let result = games;
+    let result = displayGames;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       result = result.filter((g) => g.title.toLowerCase().includes(q));
@@ -114,7 +131,7 @@ export default function HomePage() {
         break;
     }
     return sorted;
-  }, [games, search, tag, sort]);
+  }, [displayGames, search, tag, sort]);
 
   async function pickRandom() {
     const res = await fetch(`/api/games/random${tag ? `?tag=${encodeURIComponent(tag)}` : ""}`);
@@ -167,6 +184,19 @@ export default function HomePage() {
             }`}
           >
             Durchgespielt
+          </button>
+          <button
+            onClick={() => setTab("mine")}
+            className={`rounded px-3 py-1.5 text-sm ${
+              tab === "mine" ? "bg-neutral-700" : "hover:bg-neutral-800"
+            }`}
+          >
+            Warte auf Antwort
+            {myRequests.length > 0 && (
+              <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.5 text-xs font-bold text-neutral-900">
+                {myRequests.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -221,7 +251,11 @@ export default function HomePage() {
       {loading ? (
         <p className="text-neutral-400">Lade…</p>
       ) : filteredGames.length === 0 ? (
-        <p className="text-neutral-400">Keine Spiele gefunden.</p>
+        <p className="text-neutral-400">
+          {tab === "mine"
+            ? "Keine offenen Anfragen von dir — alles, was du vorgeschlagen oder abgehakt hast, ist schon entschieden."
+            : "Keine Spiele gefunden."}
+        </p>
       ) : (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
           {filteredGames.map((game) => (

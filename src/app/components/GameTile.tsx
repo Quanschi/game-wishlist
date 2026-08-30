@@ -43,6 +43,16 @@ export function GameTile({
           Durchgespielt
         </span>
       )}
+      {game.status === "pending_add" && (
+        <span className="absolute right-2 top-2 rounded bg-amber-600/90 px-2 py-0.5 text-xs font-medium">
+          Wartet auf Zustimmung
+        </span>
+      )}
+      {game.status === "pending_complete" && (
+        <span className="absolute right-2 top-2 rounded bg-amber-600/90 px-2 py-0.5 text-xs font-medium">
+          Durchspielen wartet
+        </span>
+      )}
       {highlight && (
         <span className="absolute right-2 top-2 rounded bg-amber-500/90 px-2 py-0.5 text-xs font-medium text-neutral-900">
           🎲 Ausgewählt
