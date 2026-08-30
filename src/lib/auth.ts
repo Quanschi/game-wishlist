@@ -44,21 +44,9 @@ export async function verifyCredentials(
   userId: string,
   password: string
 ): Promise<boolean> {
-  const accounts = getAccounts();
-  console.log(
-    "[login-debug] Versuch für userId=%s | bekannte Accounts=%o | eingegebene userId Länge=%d",
-    JSON.stringify(userId),
-    accounts.map((a) => ({ id: a.id, hashPrefix: a.passwordHash.slice(0, 4) })),
-    userId.length
-  );
-  const account = accounts.find((a) => a.id === userId);
-  if (!account) {
-    console.log("[login-debug] Kein Account mit dieser userId gefunden");
-    return false;
-  }
-  const ok = await bcrypt.compare(password, account.passwordHash);
-  console.log("[login-debug] bcrypt.compare Ergebnis=%s (Passwort-Länge=%d)", ok, password.length);
-  return ok;
+  const account = getAccounts().find((a) => a.id === userId);
+  if (!account) return false;
+  return bcrypt.compare(password, account.passwordHash);
 }
 
 export function getOtherUserId(userId: string): string | null {
