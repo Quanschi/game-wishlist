@@ -115,6 +115,25 @@ export function GameDetailModal({
     }
   }
 
+  async function withdraw() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/games/${game.id}/withdraw`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Fehlgeschlagen");
+        return;
+      }
+      onChanged?.();
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function decidePending(decision: "approved" | "rejected") {
     if (!pendingType) return;
     setBusy(true);
@@ -275,9 +294,18 @@ export function GameDetailModal({
             )}
 
             {pendingType && alreadyDecidedPending && (
-              <span className="rounded-full bg-neutral-800 px-4 py-2 text-sm text-neutral-300">
-                Du hast bereits zugestimmt, warte auf die zweite Person
-              </span>
+              <>
+                <span className="rounded-full bg-neutral-800 px-4 py-2 text-sm text-neutral-300">
+                  Du hast bereits zugestimmt, warte auf die zweite Person
+                </span>
+                <button
+                  onClick={withdraw}
+                  disabled={busy}
+                  className="rounded-full border border-neutral-700 px-4 py-2 text-sm font-medium text-neutral-300 transition hover:border-neutral-600 hover:bg-neutral-800 disabled:opacity-50"
+                >
+                  Anfrage zurückziehen
+                </button>
+              </>
             )}
 
             {game.status === "active" && (

@@ -216,6 +216,42 @@ export async function listMyOpenRequests(userId: string): Promise<Game[]> {
   });
 }
 
+async function revertPending(gameId: number, type: ApprovalType): Promise<void> {
+  const db = await getDb();
+
+  if (type === "add") {
+    await db.execute({ sql: `DELETE FROM games WHERE id = ?`, args: [gameId] });
+    return;
+  }
+
+  if (type === "complete") {
+    await db.execute({
+      sql: `UPDATE games SET status = 'active' WHERE id = ?`,
+      args: [gameId],
+    });
+    await db.execute({
+      sql: `DELETE FROM approvals WHERE game_id = ? AND type = 'complete'`,
+      args: [gameId],
+    });
+    return;
+  }
+
+  // type === "remove"
+  const row = await db.execute({
+    sql: `SELECT pre_remove_status FROM games WHERE id = ?`,
+    args: [gameId],
+  });
+  const preStatus = (row.rows[0]?.pre_remove_status as string | null) ?? "active";
+  await db.execute({
+    sql: `UPDATE games SET status = ?, pre_remove_status = NULL WHERE id = ?`,
+    args: [preStatus, gameId],
+  });
+  await db.execute({
+    sql: `DELETE FROM approvals WHERE game_id = ? AND type = 'remove'`,
+    args: [gameId],
+  });
+}
+
 async function finalizeIfBothDecided(
   gameId: number,
   type: ApprovalType
@@ -225,59 +261,41 @@ async function finalizeIfBothDecided(
   const decisions = game.approvals.filter((a) => a.type === type);
   if (decisions.length < 2) return;
 
-  const db = await getDb();
   const anyRejected = decisions.some((d) => d.decision === "rejected");
-
-  if (type === "add") {
-    if (anyRejected) {
-      await db.execute({ sql: `DELETE FROM games WHERE id = ?`, args: [gameId] });
-    } else {
-      await db.execute({
-        sql: `UPDATE games SET status = 'active' WHERE id = ?`,
-        args: [gameId],
-      });
-    }
-    return;
-  }
-
-  if (type === "complete") {
-    if (anyRejected) {
-      await db.execute({
-        sql: `UPDATE games SET status = 'active' WHERE id = ?`,
-        args: [gameId],
-      });
-      await db.execute({
-        sql: `DELETE FROM approvals WHERE game_id = ? AND type = 'complete'`,
-        args: [gameId],
-      });
-    } else {
-      await db.execute({
-        sql: `UPDATE games SET status = 'completed', completed_at = datetime('now') WHERE id = ?`,
-        args: [gameId],
-      });
-    }
-    return;
-  }
-
-  // type === "remove"
   if (anyRejected) {
-    const row = await db.execute({
-      sql: `SELECT pre_remove_status FROM games WHERE id = ?`,
+    await revertPending(gameId, type);
+    return;
+  }
+
+  const db = await getDb();
+  if (type === "add") {
+    await db.execute({
+      sql: `UPDATE games SET status = 'active' WHERE id = ?`,
       args: [gameId],
     });
-    const preStatus =
-      (row.rows[0]?.pre_remove_status as string | null) ?? "active";
+  } else if (type === "complete") {
     await db.execute({
-      sql: `UPDATE games SET status = ?, pre_remove_status = NULL WHERE id = ?`,
-      args: [preStatus, gameId],
-    });
-    await db.execute({
-      sql: `DELETE FROM approvals WHERE game_id = ? AND type = 'remove'`,
+      sql: `UPDATE games SET status = 'completed', completed_at = datetime('now') WHERE id = ?`,
       args: [gameId],
     });
   } else {
     await db.execute({ sql: `DELETE FROM games WHERE id = ?`, args: [gameId] });
   }
+}
+
+export async function withdrawRequest(
+  gameId: number,
+  userId: string
+): Promise<void> {
+  const game = await getGameById(gameId);
+  if (!game) throw new Error("Nicht gefunden");
+  const type = pendingTypeOf(game.status);
+  if (!type) throw new Error("Diese Anfrage ist nicht mehr offen");
+  const hasDecided = game.approvals.some(
+    (a) => a.type === type && a.userId === userId
+  );
+  if (!hasDecided) throw new Error("Du hast diese Anfrage nicht gestellt");
+  await revertPending(gameId, type);
 }
 
 export async function decide(
