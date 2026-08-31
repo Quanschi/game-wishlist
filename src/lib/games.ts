@@ -415,8 +415,8 @@ export async function setPlaying(
 
   if (playing) {
     await notifyOtherUser(userId, {
-      title: "🎮 Gerade am Spielen",
-      body: `${userId} spielt gerade "${game.title}"`,
+      title: "🎮 Euer aktuelles Spiel",
+      body: `${userId} hat "${game.title}" als das Spiel markiert, das ihr gerade spielt`,
     });
   }
 }
