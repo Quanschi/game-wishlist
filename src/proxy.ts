@@ -7,6 +7,7 @@ const PUBLIC_PATHS = [
   "/manifest.webmanifest",
   "/icon.png",
   "/apple-icon.png",
+  "/sw.js",
 ];
 
 export async function proxy(req: NextRequest) {

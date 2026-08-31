@@ -17,7 +17,7 @@ export async function POST(
   const playing = Boolean(body?.playing);
 
   try {
-    await setPlaying(gameId, playing);
+    await setPlaying(gameId, playing, userId);
   } catch {
     return NextResponse.json(
       { error: "Spiel ist nicht aktiv" },

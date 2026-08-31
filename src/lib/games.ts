@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { getOtherUserId } from "./auth";
+import { notifyOtherUser } from "./push";
 import type { SteamGameDetails } from "./steam";
 
 export type GameStatus =
@@ -159,6 +160,12 @@ export async function createGameRequest(
 
   const game = await getGameById(id);
   if (!game) throw new Error("Konnte Spiel nicht laden nach dem Anlegen");
+
+  await notifyOtherUser(requestedBy, {
+    title: "Neuer Spielvorschlag",
+    body: `${requestedBy} möchte "${game.title}" zur Liste hinzufügen`,
+  });
+
   return game;
 }
 
@@ -343,6 +350,11 @@ export async function requestCompletion(
     args: [gameId, userId],
   });
   await finalizeIfBothDecided(gameId, "complete");
+
+  await notifyOtherUser(userId, {
+    title: "Durchgespielt-Markierung",
+    body: `${userId} möchte "${game.title}" als durchgespielt markieren`,
+  });
 }
 
 export async function requestRemoval(
@@ -363,6 +375,11 @@ export async function requestRemoval(
     args: [gameId, userId],
   });
   await finalizeIfBothDecided(gameId, "remove");
+
+  await notifyOtherUser(userId, {
+    title: "Entfernen-Anfrage",
+    body: `${userId} möchte "${game.title}" von der Liste entfernen`,
+  });
 }
 
 export async function reopenGame(gameId: number): Promise<void> {
@@ -383,7 +400,8 @@ export async function reopenGame(gameId: number): Promise<void> {
 
 export async function setPlaying(
   gameId: number,
-  playing: boolean
+  playing: boolean,
+  userId: string
 ): Promise<void> {
   const db = await getDb();
   const game = await getGameById(gameId);
@@ -394,6 +412,13 @@ export async function setPlaying(
     sql: `UPDATE games SET is_playing = ? WHERE id = ?`,
     args: [playing ? 1 : 0, gameId],
   });
+
+  if (playing) {
+    await notifyOtherUser(userId, {
+      title: "🎮 Gerade am Spielen",
+      body: `${userId} spielt gerade "${game.title}"`,
+    });
+  }
 }
 
 export async function getRandomActiveGame(tag?: string): Promise<Game | null> {

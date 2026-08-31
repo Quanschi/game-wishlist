@@ -7,6 +7,7 @@ import { GameTile } from "./components/GameTile";
 import { GameDetailModal } from "./components/GameDetailModal";
 import { AddGameModal } from "./components/AddGameModal";
 import { PendingBell } from "./components/PendingBell";
+import { NotificationSetup } from "./components/NotificationSetup";
 import { RandomPickerModal } from "./components/RandomPickerModal";
 import { SearchIcon } from "./components/icons";
 
@@ -149,6 +150,7 @@ export default function HomePage() {
         <h1 className="mr-auto text-lg font-semibold tracking-tight sm:text-xl">
           Spiele-Wunschliste
         </h1>
+        <NotificationSetup />
         <span className="text-sm text-neutral-400">Angemeldet als {userId}</span>
         <button
           onClick={logout}
