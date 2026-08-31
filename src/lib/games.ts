@@ -32,10 +32,13 @@ export type Game = {
   categories: string[];
   releaseDate: string | null;
   price: string | null;
+  originalPrice: string | null;
+  discountPercent: number;
   reviewScoreDesc: string | null;
   reviewPositivePercent: number | null;
   reviewTotal: number | null;
   status: GameStatus;
+  isPlaying: boolean;
   requestedBy: string;
   requestedAt: string;
   completedAt: string | null;
@@ -55,10 +58,13 @@ type GameRow = {
   categories: string;
   release_date: string | null;
   price: string | null;
+  original_price: string | null;
+  discount_percent: number;
   review_score_desc: string | null;
   review_positive_percent: number | null;
   review_total: number | null;
   status: string;
+  is_playing: number;
   requested_by: string;
   requested_at: string;
   completed_at: string | null;
@@ -83,10 +89,13 @@ async function rowToGame(row: GameRow): Promise<Game> {
     categories: JSON.parse(row.categories) as string[],
     releaseDate: row.release_date,
     price: row.price,
+    originalPrice: row.original_price,
+    discountPercent: row.discount_percent ?? 0,
     reviewScoreDesc: row.review_score_desc,
     reviewPositivePercent: row.review_positive_percent,
     reviewTotal: row.review_total,
     status: row.status as GameStatus,
+    isPlaying: Boolean(row.is_playing),
     requestedBy: row.requested_by,
     requestedAt: row.requested_at,
     completedAt: row.completed_at,
@@ -116,9 +125,10 @@ export async function createGameRequest(
     sql: `INSERT INTO games (
       steam_appid, title, header_image, short_description, detailed_description,
       trailer_url, steam_url, genres, categories, release_date, price,
+      original_price, discount_percent,
       review_score_desc, review_positive_percent, review_total,
       status, requested_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_add', ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_add', ?)
     RETURNING id`,
     args: [
       details.appid,
@@ -132,6 +142,8 @@ export async function createGameRequest(
       JSON.stringify(details.categories),
       details.releaseDate,
       details.price,
+      details.originalPrice,
+      details.discountPercent,
       details.reviews?.scoreDesc ?? null,
       details.reviews?.positivePercent ?? null,
       details.reviews?.totalReviews ?? null,
@@ -275,7 +287,7 @@ async function finalizeIfBothDecided(
     });
   } else if (type === "complete") {
     await db.execute({
-      sql: `UPDATE games SET status = 'completed', completed_at = datetime('now') WHERE id = ?`,
+      sql: `UPDATE games SET status = 'completed', completed_at = datetime('now'), is_playing = 0 WHERE id = ?`,
       args: [gameId],
     });
   } else {
@@ -366,6 +378,21 @@ export async function reopenGame(gameId: number): Promise<void> {
   await db.execute({
     sql: `DELETE FROM approvals WHERE game_id = ? AND type = 'complete'`,
     args: [gameId],
+  });
+}
+
+export async function setPlaying(
+  gameId: number,
+  playing: boolean
+): Promise<void> {
+  const db = await getDb();
+  const game = await getGameById(gameId);
+  if (!game || game.status !== "active") {
+    throw new Error("Spiel ist nicht aktiv");
+  }
+  await db.execute({
+    sql: `UPDATE games SET is_playing = ? WHERE id = ?`,
+    args: [playing ? 1 : 0, gameId],
   });
 }
 

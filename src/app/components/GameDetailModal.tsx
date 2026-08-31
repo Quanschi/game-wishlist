@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Game } from "@/lib/types";
 import { CheckIcon, ChevronDownIcon, XIcon } from "./icons";
 
@@ -20,7 +20,7 @@ const reviewToneClasses: Record<string, string> = {
 };
 
 export function GameDetailModal({
-  game,
+  game: initialGame,
   currentUserId,
   onClose,
   onCompleteRequested,
@@ -32,6 +32,8 @@ export function GameDetailModal({
   onCompleteRequested: () => void;
   onChanged?: () => void;
 }) {
+  const [game, setGame] = useState(initialGame);
+  useEffect(() => setGame(initialGame), [initialGame]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tagsExpanded, setTagsExpanded] = useState(false);
@@ -92,6 +94,28 @@ export function GameDetailModal({
         return;
       }
       onCompleteRequested();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function togglePlaying() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/games/${game.id}/playing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ playing: !game.isPlaying }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error ?? "Fehlgeschlagen");
+        return;
+      }
+      const data = await res.json();
+      if (data.game) setGame(data.game);
+      onChanged?.();
     } finally {
       setBusy(false);
     }
@@ -250,9 +274,27 @@ export function GameDetailModal({
             </div>
           )}
 
-          <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-neutral-400">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm text-neutral-400">
             {game.releaseDate && <span>Release: {game.releaseDate}</span>}
-            {game.price && <span>Preis: {game.price}</span>}
+            {game.price && (
+              <span className="flex items-center gap-2">
+                {game.discountPercent > 0 && game.originalPrice ? (
+                  <>
+                    <span className="rounded bg-rose-600 px-1.5 py-0.5 text-xs font-bold text-white">
+                      -{game.discountPercent}%
+                    </span>
+                    <span className="text-neutral-500 line-through">
+                      {game.originalPrice}
+                    </span>
+                    <span className="font-medium text-emerald-400">
+                      {game.price}
+                    </span>
+                  </>
+                ) : (
+                  <span>Preis: {game.price}</span>
+                )}
+              </span>
+            )}
             <span>Vorgeschlagen von: {game.requestedBy}</span>
           </div>
 
@@ -306,6 +348,20 @@ export function GameDetailModal({
                   Anfrage zurückziehen
                 </button>
               </>
+            )}
+
+            {game.status === "active" && (
+              <button
+                onClick={togglePlaying}
+                disabled={busy}
+                className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium transition disabled:opacity-50 ${
+                  game.isPlaying
+                    ? "bg-sky-600 text-white hover:bg-sky-500"
+                    : "border border-sky-800/60 text-sky-400 hover:bg-sky-950/40"
+                }`}
+              >
+                🎮 {game.isPlaying ? "Wird gerade gespielt" : "Gerade am Spielen"}
+              </button>
             )}
 
             {game.status === "active" && (

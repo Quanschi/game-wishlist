@@ -22,6 +22,8 @@ export type SteamGameDetails = {
   categories: string[];
   releaseDate: string | null;
   price: string | null;
+  originalPrice: string | null;
+  discountPercent: number;
   screenshots: string[];
   reviews: SteamReviewSummary | null;
 };
@@ -137,7 +139,11 @@ export async function getSteamAppDetails(
         genres?: Array<{ description: string }>;
         categories?: Array<{ description: string }>;
         release_date?: { date: string };
-        price_overview?: { final_formatted: string };
+        price_overview?: {
+          final_formatted: string;
+          initial_formatted?: string;
+          discount_percent?: number;
+        };
         is_free?: boolean;
         movies?: Array<{
           mp4?: { max?: string; ["480"]?: string };
@@ -176,6 +182,10 @@ export async function getSteamAppDetails(
     price: d.is_free
       ? "Kostenlos"
       : (d.price_overview?.final_formatted ?? null),
+    originalPrice: d.price_overview?.discount_percent
+      ? (d.price_overview?.initial_formatted ?? null)
+      : null,
+    discountPercent: d.price_overview?.discount_percent ?? 0,
     screenshots: (d.screenshots ?? []).map((s) => s.path_full),
     reviews,
   };

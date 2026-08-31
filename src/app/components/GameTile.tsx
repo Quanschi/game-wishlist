@@ -37,6 +37,16 @@ export function GameTile({
             {game.reviewPositivePercent}%
           </span>
         )}
+        {game.discountPercent > 0 && (
+          <span className="absolute bottom-1.5 right-1.5 rounded-md bg-rose-600 px-1.5 py-0.5 text-[11px] font-bold text-white">
+            -{game.discountPercent}%
+          </span>
+        )}
+        {game.isPlaying && game.status === "active" && (
+          <span className="absolute left-1.5 top-1.5 rounded-full bg-sky-600/90 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur-sm">
+            🎮 Spielt gerade
+          </span>
+        )}
       </div>
       <div className="p-3">
         <p className="truncate font-medium">{game.title}</p>

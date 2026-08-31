@@ -60,6 +60,9 @@ async function migrate(db: Client) {
     ["review_positive_percent", "INTEGER"],
     ["review_total", "INTEGER"],
     ["pre_remove_status", "TEXT"],
+    ["original_price", "TEXT"],
+    ["discount_percent", "INTEGER NOT NULL DEFAULT 0"],
+    ["is_playing", "INTEGER NOT NULL DEFAULT 0"],
   ];
   for (const [name, type] of reviewColumns) {
     if (!existing.has(name)) {

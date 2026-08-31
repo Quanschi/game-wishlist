@@ -7,6 +7,7 @@ import { GameTile } from "./components/GameTile";
 import { GameDetailModal } from "./components/GameDetailModal";
 import { AddGameModal } from "./components/AddGameModal";
 import { PendingBell } from "./components/PendingBell";
+import { RandomPickerModal } from "./components/RandomPickerModal";
 import { SearchIcon } from "./components/icons";
 
 type SortKey = "newest" | "title-asc" | "title-desc" | "release";
@@ -26,6 +27,7 @@ export default function HomePage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showRandomPicker, setShowRandomPicker] = useState(false);
 
   const loadGames = useCallback(async (view: Tab) => {
     if (view === "mine") return;
@@ -134,18 +136,6 @@ export default function HomePage() {
     return sorted;
   }, [displayGames, search, tag, sort]);
 
-  async function pickRandom() {
-    const res = await fetch(`/api/games/random${tag ? `?tag=${encodeURIComponent(tag)}` : ""}`);
-    if (!res.ok) {
-      alert("Keine aktiven Spiele auf der Liste");
-      return;
-    }
-    const data = await res.json();
-    setTab("active");
-    setHighlightId(data.game.id);
-    setSelectedGame(data.game);
-  }
-
   if (!userId) return null;
 
   return (
@@ -243,7 +233,7 @@ export default function HomePage() {
 
         {tab === "active" && (
           <button
-            onClick={pickRandom}
+            onClick={() => setShowRandomPicker(true)}
             className="rounded-full bg-violet-600 px-3.5 py-1.5 text-sm font-medium text-white transition hover:bg-violet-500"
           >
             🎲 Zufälliges Spiel
@@ -296,6 +286,20 @@ export default function HomePage() {
         <AddGameModal
           onClose={() => setShowAddModal(false)}
           onRequested={refreshAll}
+        />
+      )}
+
+      {showRandomPicker && (
+        <RandomPickerModal
+          titles={games.map((g) => g.title)}
+          tag={tag || undefined}
+          onClose={() => setShowRandomPicker(false)}
+          onRevealed={(game) => setHighlightId(game.id)}
+          onOpenDetails={(game) => {
+            setShowRandomPicker(false);
+            setSelectedGame(game);
+          }}
+          onChanged={refreshAll}
         />
       )}
     </main>
