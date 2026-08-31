@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import confetti from "canvas-confetti";
 import type { Game } from "@/lib/types";
-import { StarIcon, XIcon } from "./icons";
+import { DiceIcon, StarIcon, XIcon } from "./icons";
 
 const ROLL_DURATION_MS = 3000;
 const CYCLE_INTERVAL_MS = 90;
@@ -220,7 +220,8 @@ export function RandomPickerModal({
                   onClick={() => setRollKey((k) => k + 1)}
                   className="flex items-center gap-1.5 rounded-full bg-violet-600 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-violet-500"
                 >
-                  🔄 Reroll
+                  <DiceIcon className="h-4 w-4" />
+                  Reroll
                 </button>
                 <button
                   onClick={() => onOpenDetails(revealedGame)}
