@@ -44,6 +44,11 @@ function PrivateWishlistTile({
       </div>
       <div className="p-3">
         <p className="truncate font-medium">{item.title}</p>
+        {item.requiresTitle && (
+          <p className="mt-0.5 truncate text-xs text-amber-500">
+            Benötigt: {item.requiresTitle}
+          </p>
+        )}
         {item.genres.length > 0 && (
           <p className="mt-1 truncate text-xs text-neutral-500">
             {item.genres.slice(0, 3).join(" · ")}
@@ -135,6 +140,12 @@ function PrivateWishlistDetailModal({
               </span>
             )}
           </div>
+
+          {item.requiresTitle && (
+            <p className="text-sm text-amber-500">
+              Benötigt Hauptspiel: {item.requiresTitle}
+            </p>
+          )}
 
           {item.shortDescription && (
             <p className="text-sm leading-relaxed text-neutral-300">

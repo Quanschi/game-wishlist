@@ -230,6 +230,12 @@ export function GameDetailModal({
             )}
           </div>
 
+          {game.requiresTitle && (
+            <p className="text-sm text-amber-500">
+              Benötigt Hauptspiel: {game.requiresTitle}
+            </p>
+          )}
+
           {pendingType && (
             <div
               className={`rounded-lg border px-3.5 py-2.5 text-sm ${

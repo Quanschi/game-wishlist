@@ -50,6 +50,11 @@ export function GameTile({
       </div>
       <div className="p-3">
         <p className="truncate font-medium">{game.title}</p>
+        {game.requiresTitle && (
+          <p className="mt-0.5 truncate text-xs text-amber-500">
+            Benötigt: {game.requiresTitle}
+          </p>
+        )}
         {game.genres.length > 0 && (
           <p className="mt-1 truncate text-xs text-neutral-500">
             {game.genres.slice(0, 3).join(" · ")}

@@ -24,6 +24,8 @@ export type PrivateWishlistItem = {
   reviewScoreDesc: string | null;
   reviewPositivePercent: number | null;
   reviewTotal: number | null;
+  requiresAppid: number | null;
+  requiresTitle: string | null;
   genres: string[];
   categories: string[];
   releaseDate: string | null;
@@ -43,6 +45,8 @@ type Row = {
   review_score_desc: string | null;
   review_positive_percent: number | null;
   review_total: number | null;
+  requires_appid: number | null;
+  requires_title: string | null;
   genres: string;
   categories: string;
   release_date: string | null;
@@ -69,6 +73,8 @@ async function rowToItem(userId: string, row: Row): Promise<PrivateWishlistItem>
     reviewScoreDesc: row.review_score_desc,
     reviewPositivePercent: row.review_positive_percent,
     reviewTotal: row.review_total,
+    requiresAppid: row.requires_appid,
+    requiresTitle: row.requires_title,
     genres: JSON.parse(row.genres) as string[],
     categories: JSON.parse(row.categories) as string[],
     releaseDate: row.release_date,
@@ -194,8 +200,9 @@ export async function refreshPrivateWishlist(userId: string): Promise<void> {
             user_id, steam_appid, title, header_image, short_description, steam_url,
             price, original_price, discount_percent, gg_deals_url, gg_deals_checked,
             review_score_desc, review_positive_percent, review_total,
+            requires_appid, requires_title,
             genres, categories, release_date, price_updated_at, date_added
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?)
           ON CONFLICT(user_id, steam_appid) DO NOTHING`,
           args: [
             userId,
@@ -212,6 +219,8 @@ export async function refreshPrivateWishlist(userId: string): Promise<void> {
             details.reviews?.scoreDesc ?? null,
             details.reviews?.positivePercent ?? null,
             details.reviews?.totalReviews ?? null,
+            details.requiresAppid,
+            details.requiresTitle,
             JSON.stringify(details.genres),
             JSON.stringify(details.categories),
             details.releaseDate,

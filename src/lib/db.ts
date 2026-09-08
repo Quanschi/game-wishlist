@@ -156,12 +156,16 @@ async function migrate(db: Client) {
     ["gg_deals_url", "TEXT"],
     ["gg_deals_checked", "INTEGER NOT NULL DEFAULT 0"],
     ["dlc_checked", "INTEGER NOT NULL DEFAULT 0"],
+    ["requires_appid", "INTEGER"],
+    ["requires_title", "TEXT"],
   ]);
 
   await ensureColumns(db, "private_wishlist_items", [
     ["gg_deals_url", "TEXT"],
     ["gg_deals_checked", "INTEGER NOT NULL DEFAULT 0"],
     ["dlc_checked", "INTEGER NOT NULL DEFAULT 0"],
+    ["requires_appid", "INTEGER"],
+    ["requires_title", "TEXT"],
   ]);
 }
 

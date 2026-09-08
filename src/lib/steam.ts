@@ -27,6 +27,8 @@ export type SteamGameDetails = {
   screenshots: string[];
   reviews: SteamReviewSummary | null;
   dlcAppIds: number[];
+  requiresAppid: number | null;
+  requiresTitle: string | null;
 };
 
 export type SteamDlcInfo = {
@@ -204,6 +206,7 @@ export async function getSteamAppDetails(
         }>;
         screenshots?: Array<{ path_full: string }>;
         dlc?: number[];
+        fullgame?: { appid: string; name: string };
       };
     }
   >;
@@ -243,6 +246,8 @@ export async function getSteamAppDetails(
     screenshots: (d.screenshots ?? []).map((s) => s.path_full),
     reviews,
     dlcAppIds: d.dlc ?? [],
+    requiresAppid: d.fullgame ? Number(d.fullgame.appid) : null,
+    requiresTitle: d.fullgame?.name ?? null,
   };
 }
 
