@@ -55,6 +55,10 @@ export function getOtherUserId(userId: string): string | null {
   return other?.id ?? null;
 }
 
+export function getAllUserIds(): string[] {
+  return getAccounts().map((a) => a.id);
+}
+
 export function isKnownUser(userId: string): boolean {
   return getAccounts().some((a) => a.id === userId);
 }

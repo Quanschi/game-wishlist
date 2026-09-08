@@ -1,7 +1,9 @@
 import { getDb } from "./db";
 import { getOtherUserId } from "./auth";
-import { notifyOtherUser } from "./push";
-import type { SteamGameDetails } from "./steam";
+import { notifyAllUsers, notifyOtherUser } from "./push";
+import { getSteamPriceInfo, type SteamGameDetails } from "./steam";
+
+const PRICE_TTL_MS = 20 * 60 * 1000;
 
 export type GameStatus =
   | "pending_add"
@@ -35,6 +37,7 @@ export type Game = {
   price: string | null;
   originalPrice: string | null;
   discountPercent: number;
+  priceUpdatedAt: string | null;
   reviewScoreDesc: string | null;
   reviewPositivePercent: number | null;
   reviewTotal: number | null;
@@ -61,6 +64,7 @@ type GameRow = {
   price: string | null;
   original_price: string | null;
   discount_percent: number;
+  price_updated_at: string | null;
   review_score_desc: string | null;
   review_positive_percent: number | null;
   review_total: number | null;
@@ -92,6 +96,7 @@ async function rowToGame(row: GameRow): Promise<Game> {
     price: row.price,
     originalPrice: row.original_price,
     discountPercent: row.discount_percent ?? 0,
+    priceUpdatedAt: row.price_updated_at,
     reviewScoreDesc: row.review_score_desc,
     reviewPositivePercent: row.review_positive_percent,
     reviewTotal: row.review_total,
@@ -126,10 +131,10 @@ export async function createGameRequest(
     sql: `INSERT INTO games (
       steam_appid, title, header_image, short_description, detailed_description,
       trailer_url, steam_url, genres, categories, release_date, price,
-      original_price, discount_percent,
+      original_price, discount_percent, price_updated_at,
       review_score_desc, review_positive_percent, review_total,
       status, requested_by
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_add', ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, 'pending_add', ?)
     RETURNING id`,
     args: [
       details.appid,
@@ -176,7 +181,76 @@ export async function getGameById(id: number): Promise<Game | null> {
     args: [id],
   });
   if (res.rows.length === 0) return null;
-  return rowToGame(res.rows[0] as unknown as GameRow);
+  const [game] = await refreshStalePrices([
+    await rowToGame(res.rows[0] as unknown as GameRow),
+  ]);
+  return game;
+}
+
+async function refreshStalePrices(
+  games: Game[],
+  force = false
+): Promise<Game[]> {
+  const db = await getDb();
+  const now = Date.now();
+
+  await Promise.all(
+    games.map(async (game) => {
+      if (!game.steamAppid) return;
+      if (
+        !force &&
+        game.priceUpdatedAt &&
+        now - new Date(game.priceUpdatedAt + "Z").getTime() < PRICE_TTL_MS
+      ) {
+        return;
+      }
+
+      const info = await getSteamPriceInfo(game.steamAppid);
+      await db.execute({
+        sql: `UPDATE games SET price = ?, original_price = ?, discount_percent = ?, price_updated_at = datetime('now') WHERE id = ?`,
+        args: [
+          info?.price ?? game.price,
+          info?.originalPrice ?? null,
+          info?.discountPercent ?? 0,
+          game.id,
+        ],
+      });
+
+      const oldDiscount = game.discountPercent;
+      const newDiscount = info?.discountPercent ?? 0;
+
+      game.price = info?.price ?? game.price;
+      game.originalPrice = info?.originalPrice ?? null;
+      game.discountPercent = newDiscount;
+      game.priceUpdatedAt = new Date().toISOString();
+
+      if (
+        info &&
+        newDiscount > 0 &&
+        oldDiscount <= 0 &&
+        (game.status === "active" || game.status === "completed")
+      ) {
+        await notifyAllUsers({
+          title: "🏷️ Sale!",
+          body: `"${game.title}" ist gerade im Sale: -${newDiscount}% für ${info.price}`,
+        });
+      }
+    })
+  );
+
+  return games;
+}
+
+export async function forceRefreshAllPrices(): Promise<void> {
+  const db = await getDb();
+  const res = await db.execute({
+    sql: `SELECT * FROM games WHERE status IN ('active','completed') AND steam_appid IS NOT NULL`,
+    args: [],
+  });
+  const games = await Promise.all(
+    res.rows.map((r) => rowToGame(r as unknown as GameRow))
+  );
+  await refreshStalePrices(games, true);
 }
 
 export async function listGames(filter: {
@@ -194,8 +268,8 @@ export async function listGames(filter: {
   }
   sql += ` ORDER BY requested_at DESC`;
   const res = await db.execute({ sql, args });
-  const games = await Promise.all(
-    res.rows.map((r) => rowToGame(r as unknown as GameRow))
+  const games = await refreshStalePrices(
+    await Promise.all(res.rows.map((r) => rowToGame(r as unknown as GameRow)))
   );
   if (filter.tag) {
     return games.filter(

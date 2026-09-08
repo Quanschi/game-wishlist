@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
   "/icon.png",
   "/apple-icon.png",
   "/sw.js",
+  "/api/cron/refresh-prices",
 ];
 
 export async function proxy(req: NextRequest) {

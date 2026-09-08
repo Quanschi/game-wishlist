@@ -1,6 +1,6 @@
 import webpush from "web-push";
 import { getDb } from "./db";
-import { getOtherUserId } from "./auth";
+import { getAllUserIds, getOtherUserId } from "./auth";
 
 type PushPayload = {
   title: string;
@@ -85,4 +85,8 @@ export async function notifyOtherUser(
   const otherUserId = getOtherUserId(currentUserId);
   if (!otherUserId) return;
   await sendPushToUser(otherUserId, payload);
+}
+
+export async function notifyAllUsers(payload: PushPayload): Promise<void> {
+  await Promise.all(getAllUserIds().map((userId) => sendPushToUser(userId, payload)));
 }

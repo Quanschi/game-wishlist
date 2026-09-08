@@ -121,6 +121,48 @@ export async function searchSteamGames(
   }));
 }
 
+export type SteamPriceInfo = {
+  price: string | null;
+  originalPrice: string | null;
+  discountPercent: number;
+};
+
+export async function getSteamPriceInfo(
+  appId: number
+): Promise<SteamPriceInfo | null> {
+  const url = `${STORE_API}/appdetails?appids=${appId}&l=german&cc=de&filters=price_overview`;
+  try {
+    const res = await fetch(url, { next: { revalidate: 0 } });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Record<
+      string,
+      {
+        success: boolean;
+        data?: {
+          price_overview?: {
+            final_formatted: string;
+            initial_formatted?: string;
+            discount_percent?: number;
+          };
+          is_free?: boolean;
+        };
+      }
+    >;
+    const entry = data[String(appId)];
+    if (!entry?.success || !entry.data) return null;
+    const d = entry.data;
+    return {
+      price: d.is_free ? "Kostenlos" : (d.price_overview?.final_formatted ?? null),
+      originalPrice: d.price_overview?.discount_percent
+        ? (d.price_overview?.initial_formatted ?? null)
+        : null,
+      discountPercent: d.price_overview?.discount_percent ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getSteamAppDetails(
   appId: number
 ): Promise<SteamGameDetails | null> {
