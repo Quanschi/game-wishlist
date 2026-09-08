@@ -310,6 +310,17 @@ export function GameDetailModal({
               </a>
             )}
 
+            {game.ggDealsUrl && (
+              <a
+                href={game.ggDealsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-neutral-800 px-4 py-2 text-sm font-medium transition hover:bg-neutral-700"
+              >
+                Auf gg.deals ansehen
+              </a>
+            )}
+
             {pendingType && !alreadyDecidedPending && (
               <>
                 <button

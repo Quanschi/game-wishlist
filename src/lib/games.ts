@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { getOtherUserId } from "./auth";
+import { getGgDealsUrls } from "./ggdeals";
 import { notifyAllUsers, notifyOtherUser } from "./push";
 import { getSteamPriceInfo, type SteamGameDetails } from "./steam";
 
@@ -38,6 +39,7 @@ export type Game = {
   originalPrice: string | null;
   discountPercent: number;
   priceUpdatedAt: string | null;
+  ggDealsUrl: string | null;
   reviewScoreDesc: string | null;
   reviewPositivePercent: number | null;
   reviewTotal: number | null;
@@ -65,6 +67,8 @@ type GameRow = {
   original_price: string | null;
   discount_percent: number;
   price_updated_at: string | null;
+  gg_deals_url: string | null;
+  gg_deals_checked: number;
   review_score_desc: string | null;
   review_positive_percent: number | null;
   review_total: number | null;
@@ -97,6 +101,7 @@ async function rowToGame(row: GameRow): Promise<Game> {
     originalPrice: row.original_price,
     discountPercent: row.discount_percent ?? 0,
     priceUpdatedAt: row.price_updated_at,
+    ggDealsUrl: row.gg_deals_url,
     reviewScoreDesc: row.review_score_desc,
     reviewPositivePercent: row.review_positive_percent,
     reviewTotal: row.review_total,
@@ -181,9 +186,10 @@ export async function getGameById(id: number): Promise<Game | null> {
     args: [id],
   });
   if (res.rows.length === 0) return null;
-  const [game] = await refreshStalePrices([
+  const games = await refreshStalePrices([
     await rowToGame(res.rows[0] as unknown as GameRow),
   ]);
+  const [game] = await fillMissingGgDealsUrls(games);
   return game;
 }
 
@@ -241,6 +247,38 @@ async function refreshStalePrices(
   return games;
 }
 
+async function fillMissingGgDealsUrls(games: Game[]): Promise<Game[]> {
+  const db = await getDb();
+  const ids = games.map((g) => g.id);
+  if (ids.length === 0) return games;
+
+  const placeholders = ids.map(() => "?").join(",");
+  const res = await db.execute({
+    sql: `SELECT id, steam_appid FROM games WHERE gg_deals_checked = 0 AND steam_appid IS NOT NULL AND id IN (${placeholders})`,
+    args: ids,
+  });
+  const pending = res.rows.map((r) => ({
+    id: r.id as number,
+    steamAppid: r.steam_appid as number,
+  }));
+  if (pending.length === 0) return games;
+
+  const urls = await getGgDealsUrls(pending.map((p) => p.steamAppid));
+  await Promise.all(
+    pending.map(async (p) => {
+      const url = urls[p.steamAppid] ?? null;
+      await db.execute({
+        sql: `UPDATE games SET gg_deals_url = ?, gg_deals_checked = 1 WHERE id = ?`,
+        args: [url, p.id],
+      });
+      const game = games.find((g) => g.id === p.id);
+      if (game) game.ggDealsUrl = url;
+    })
+  );
+
+  return games;
+}
+
 export async function forceRefreshAllPrices(): Promise<void> {
   const db = await getDb();
   const res = await db.execute({
@@ -268,8 +306,10 @@ export async function listGames(filter: {
   }
   sql += ` ORDER BY requested_at DESC`;
   const res = await db.execute({ sql, args });
-  const games = await refreshStalePrices(
-    await Promise.all(res.rows.map((r) => rowToGame(r as unknown as GameRow)))
+  const games = await fillMissingGgDealsUrls(
+    await refreshStalePrices(
+      await Promise.all(res.rows.map((r) => rowToGame(r as unknown as GameRow)))
+    )
   );
   if (filter.tag) {
     return games.filter(
@@ -285,8 +325,8 @@ export async function listPendingForUser(userId: string): Promise<Game[]> {
     sql: `SELECT * FROM games WHERE status IN ('pending_add','pending_complete','pending_remove')`,
     args: [],
   });
-  const games = await Promise.all(
-    res.rows.map((r) => rowToGame(r as unknown as GameRow))
+  const games = await fillMissingGgDealsUrls(
+    await Promise.all(res.rows.map((r) => rowToGame(r as unknown as GameRow)))
   );
   return games.filter((g) => {
     const type = pendingTypeOf(g.status);
@@ -300,8 +340,8 @@ export async function listMyOpenRequests(userId: string): Promise<Game[]> {
     sql: `SELECT * FROM games WHERE status IN ('pending_add','pending_complete','pending_remove')`,
     args: [],
   });
-  const games = await Promise.all(
-    res.rows.map((r) => rowToGame(r as unknown as GameRow))
+  const games = await fillMissingGgDealsUrls(
+    await Promise.all(res.rows.map((r) => rowToGame(r as unknown as GameRow)))
   );
   return games.filter((g) => {
     const type = pendingTypeOf(g.status);

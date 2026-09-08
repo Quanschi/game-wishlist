@@ -78,6 +78,8 @@ async function migrate(db: Client) {
     ["discount_percent", "INTEGER NOT NULL DEFAULT 0"],
     ["is_playing", "INTEGER NOT NULL DEFAULT 0"],
     ["price_updated_at", "TEXT"],
+    ["gg_deals_url", "TEXT"],
+    ["gg_deals_checked", "INTEGER NOT NULL DEFAULT 0"],
   ];
   for (const [name, type] of reviewColumns) {
     if (!existing.has(name)) {
