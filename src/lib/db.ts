@@ -58,6 +58,38 @@ async function migrate(db: Client) {
   `);
 
   await db.execute(`
+    CREATE TABLE IF NOT EXISTS user_steam_ids (
+      user_id TEXT PRIMARY KEY,
+      steam_id64 TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS private_wishlist_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      steam_appid INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      header_image TEXT,
+      short_description TEXT,
+      steam_url TEXT,
+      price TEXT,
+      original_price TEXT,
+      discount_percent INTEGER NOT NULL DEFAULT 0,
+      review_score_desc TEXT,
+      review_positive_percent INTEGER,
+      review_total INTEGER,
+      genres TEXT NOT NULL DEFAULT '[]',
+      categories TEXT NOT NULL DEFAULT '[]',
+      release_date TEXT,
+      price_updated_at TEXT,
+      date_added INTEGER,
+      UNIQUE(user_id, steam_appid)
+    )
+  `);
+
+  await db.execute(`
     CREATE TABLE IF NOT EXISTS game_dlcs (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
@@ -84,6 +116,9 @@ async function migrate(db: Client) {
   );
   await db.execute(
     `CREATE INDEX IF NOT EXISTS idx_game_dlcs_game ON game_dlcs(game_id)`
+  );
+  await db.execute(
+    `CREATE INDEX IF NOT EXISTS idx_private_wishlist_user ON private_wishlist_items(user_id)`
   );
 
   const columns = await db.execute(`PRAGMA table_info(games)`);

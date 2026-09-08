@@ -9,10 +9,12 @@ import { AddGameModal } from "./components/AddGameModal";
 import { PendingBell } from "./components/PendingBell";
 import { NotificationSetup } from "./components/NotificationSetup";
 import { RandomPickerModal } from "./components/RandomPickerModal";
+import { PrivateWishlistView } from "./components/PrivateWishlist";
 import { SearchIcon } from "./components/icons";
 
 type SortKey = "newest" | "title-asc" | "title-desc" | "release";
 type Tab = "active" | "completed" | "mine";
+type View = "coop" | "private";
 
 export default function HomePage() {
   const router = useRouter();
@@ -29,6 +31,7 @@ export default function HomePage() {
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRandomPicker, setShowRandomPicker] = useState(false);
+  const [view, setView] = useState<View>("coop");
 
   const loadGames = useCallback(async (view: Tab) => {
     if (view === "mine") return;
@@ -160,7 +163,34 @@ export default function HomePage() {
         </button>
       </header>
 
-      <div className="mb-4 mt-4 flex flex-wrap items-center gap-2">
+      <div className="mb-4 mt-4 flex rounded-full border border-neutral-800 bg-neutral-900/60 p-1">
+        <button
+          onClick={() => setView("coop")}
+          className={`flex-1 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+            view === "coop"
+              ? "bg-violet-600 text-white"
+              : "text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+          }`}
+        >
+          Koop
+        </button>
+        <button
+          onClick={() => setView("private")}
+          className={`flex-1 rounded-full px-3.5 py-1.5 text-sm font-medium transition ${
+            view === "private"
+              ? "bg-violet-600 text-white"
+              : "text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+          }`}
+        >
+          Privat
+        </button>
+      </div>
+
+      {view === "private" ? (
+        <PrivateWishlistView />
+      ) : (
+        <>
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <div className="flex rounded-full border border-neutral-800 bg-neutral-900/60 p-1">
           <button
             onClick={() => setTab("active")}
@@ -303,6 +333,8 @@ export default function HomePage() {
           }}
           onChanged={refreshAll}
         />
+      )}
+        </>
       )}
     </main>
   );
