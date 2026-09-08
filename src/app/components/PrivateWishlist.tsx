@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { PrivateWishlistItem } from "@/lib/privateWishlist";
-import { StarIcon, XIcon } from "./icons";
+import { ChevronDownIcon, StarIcon, XIcon } from "./icons";
+import { DlcRow } from "./DlcRow";
+
+const MAIN_TAG_COUNT = 3;
+const DLC_PREVIEW_COUNT = 5;
 
 function PrivateWishlistTile({
   item,
@@ -62,7 +66,11 @@ function PrivateWishlistDetailModal({
     "idle"
   );
   const [error, setError] = useState<string | null>(null);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [dlcsExpanded, setDlcsExpanded] = useState(false);
   const allTags = Array.from(new Set([...item.genres, ...item.categories]));
+  const mainTags = allTags.slice(0, MAIN_TAG_COUNT);
+  const restTags = allTags.slice(MAIN_TAG_COUNT);
 
   async function propose() {
     setBusy(true);
@@ -135,8 +143,8 @@ function PrivateWishlistDetailModal({
           )}
 
           {allTags.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {allTags.slice(0, 8).map((tag) => (
+            <div className="flex flex-wrap items-center gap-2">
+              {(tagsExpanded ? allTags : mainTags).map((tag) => (
                 <span
                   key={tag}
                   className="rounded-full bg-neutral-800/80 px-2.5 py-1 text-xs text-neutral-300"
@@ -144,6 +152,17 @@ function PrivateWishlistDetailModal({
                   {tag}
                 </span>
               ))}
+              {restTags.length > 0 && (
+                <button
+                  onClick={() => setTagsExpanded((v) => !v)}
+                  className="flex items-center gap-1 rounded-full border border-neutral-700 px-2.5 py-1 text-xs text-neutral-400 transition hover:border-neutral-600 hover:text-neutral-200"
+                >
+                  {tagsExpanded ? "Weniger" : `Tags +${restTags.length}`}
+                  <ChevronDownIcon
+                    className={`h-3 w-3 transition-transform ${tagsExpanded ? "rotate-180" : ""}`}
+                  />
+                </button>
+              )}
             </div>
           )}
 
@@ -170,6 +189,41 @@ function PrivateWishlistDetailModal({
             )}
           </div>
 
+          {item.dlcs.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-neutral-300">
+                DLCs ({item.dlcs.length})
+              </p>
+              <div className="space-y-1.5">
+                {item.dlcs.slice(0, DLC_PREVIEW_COUNT).map((dlc) => (
+                  <DlcRow key={dlc.appid} dlc={dlc} />
+                ))}
+              </div>
+              {item.dlcs.length > DLC_PREVIEW_COUNT && (
+                <>
+                  {dlcsExpanded && (
+                    <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+                      {item.dlcs.slice(DLC_PREVIEW_COUNT).map((dlc) => (
+                        <DlcRow key={dlc.appid} dlc={dlc} />
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setDlcsExpanded((v) => !v)}
+                    className="flex items-center gap-1 rounded-full border border-neutral-700 px-2.5 py-1 text-xs text-neutral-400 transition hover:border-neutral-600 hover:text-neutral-200"
+                  >
+                    {dlcsExpanded
+                      ? "Weniger anzeigen"
+                      : `Mehr anzeigen (+${item.dlcs.length - DLC_PREVIEW_COUNT})`}
+                    <ChevronDownIcon
+                      className={`h-3 w-3 transition-transform ${dlcsExpanded ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center gap-2.5 pt-2">
             {item.steamUrl && (
               <a
@@ -179,6 +233,17 @@ function PrivateWishlistDetailModal({
                 className="rounded-full bg-neutral-800 px-4 py-2 text-sm font-medium transition hover:bg-neutral-700"
               >
                 Auf Steam ansehen
+              </a>
+            )}
+
+            {item.ggDealsUrl && (
+              <a
+                href={item.ggDealsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-neutral-800 px-4 py-2 text-sm font-medium transition hover:bg-neutral-700"
+              >
+                Auf gg.deals ansehen
               </a>
             )}
 

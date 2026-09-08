@@ -85,7 +85,27 @@ async function migrate(db: Client) {
       release_date TEXT,
       price_updated_at TEXT,
       date_added INTEGER,
+      gg_deals_url TEXT,
+      gg_deals_checked INTEGER NOT NULL DEFAULT 0,
+      dlc_checked INTEGER NOT NULL DEFAULT 0,
       UNIQUE(user_id, steam_appid)
+    )
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS private_wishlist_dlcs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      parent_appid INTEGER NOT NULL,
+      dlc_appid INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      header_image TEXT,
+      steam_url TEXT,
+      price TEXT,
+      original_price TEXT,
+      discount_percent INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(user_id, parent_appid, dlc_appid)
     )
   `);
 
@@ -120,10 +140,11 @@ async function migrate(db: Client) {
   await db.execute(
     `CREATE INDEX IF NOT EXISTS idx_private_wishlist_user ON private_wishlist_items(user_id)`
   );
+  await db.execute(
+    `CREATE INDEX IF NOT EXISTS idx_private_wishlist_dlcs_parent ON private_wishlist_dlcs(user_id, parent_appid)`
+  );
 
-  const columns = await db.execute(`PRAGMA table_info(games)`);
-  const existing = new Set(columns.rows.map((r) => r.name as string));
-  const reviewColumns: [string, string][] = [
+  await ensureColumns(db, "games", [
     ["review_score_desc", "TEXT"],
     ["review_positive_percent", "INTEGER"],
     ["review_total", "INTEGER"],
@@ -135,10 +156,25 @@ async function migrate(db: Client) {
     ["gg_deals_url", "TEXT"],
     ["gg_deals_checked", "INTEGER NOT NULL DEFAULT 0"],
     ["dlc_checked", "INTEGER NOT NULL DEFAULT 0"],
-  ];
-  for (const [name, type] of reviewColumns) {
+  ]);
+
+  await ensureColumns(db, "private_wishlist_items", [
+    ["gg_deals_url", "TEXT"],
+    ["gg_deals_checked", "INTEGER NOT NULL DEFAULT 0"],
+    ["dlc_checked", "INTEGER NOT NULL DEFAULT 0"],
+  ]);
+}
+
+async function ensureColumns(
+  db: Client,
+  table: string,
+  columns: [string, string][]
+) {
+  const info = await db.execute(`PRAGMA table_info(${table})`);
+  const existing = new Set(info.rows.map((r) => r.name as string));
+  for (const [name, type] of columns) {
     if (!existing.has(name)) {
-      await db.execute(`ALTER TABLE games ADD COLUMN ${name} ${type}`);
+      await db.execute(`ALTER TABLE ${table} ADD COLUMN ${name} ${type}`);
     }
   }
 }
