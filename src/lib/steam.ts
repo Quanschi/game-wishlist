@@ -26,6 +26,17 @@ export type SteamGameDetails = {
   discountPercent: number;
   screenshots: string[];
   reviews: SteamReviewSummary | null;
+  dlcAppIds: number[];
+};
+
+export type SteamDlcInfo = {
+  appid: number;
+  title: string;
+  headerImage: string | null;
+  steamUrl: string;
+  price: string | null;
+  originalPrice: string | null;
+  discountPercent: number;
 };
 
 const STORE_API = "https://store.steampowered.com/api";
@@ -192,6 +203,7 @@ export async function getSteamAppDetails(
           webm?: { max?: string; ["480"]?: string };
         }>;
         screenshots?: Array<{ path_full: string }>;
+        dlc?: number[];
       };
     }
   >;
@@ -230,5 +242,65 @@ export async function getSteamAppDetails(
     discountPercent: d.price_overview?.discount_percent ?? 0,
     screenshots: (d.screenshots ?? []).map((s) => s.path_full),
     reviews,
+    dlcAppIds: d.dlc ?? [],
   };
+}
+
+export async function getSteamDlcList(appId: number): Promise<number[]> {
+  const url = `${STORE_API}/appdetails?appids=${appId}&l=german&cc=de&filters=basic`;
+  try {
+    const res = await fetch(url, { next: { revalidate: 0 } });
+    if (!res.ok) return [];
+    const data = (await res.json()) as Record<
+      string,
+      { success: boolean; data?: { dlc?: number[] } }
+    >;
+    const entry = data[String(appId)];
+    if (!entry?.success || !entry.data) return [];
+    return entry.data.dlc ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getSteamDlcInfo(
+  appId: number
+): Promise<SteamDlcInfo | null> {
+  const url = `${STORE_API}/appdetails?appids=${appId}&l=german&cc=de&filters=basic,price_overview`;
+  try {
+    const res = await fetch(url, { next: { revalidate: 0 } });
+    if (!res.ok) return null;
+    const data = (await res.json()) as Record<
+      string,
+      {
+        success: boolean;
+        data?: {
+          name: string;
+          header_image?: string;
+          is_free?: boolean;
+          price_overview?: {
+            final_formatted: string;
+            initial_formatted?: string;
+            discount_percent?: number;
+          };
+        };
+      }
+    >;
+    const entry = data[String(appId)];
+    if (!entry?.success || !entry.data) return null;
+    const d = entry.data;
+    return {
+      appid: appId,
+      title: d.name,
+      headerImage: d.header_image ?? null,
+      steamUrl: `https://store.steampowered.com/app/${appId}`,
+      price: d.is_free ? "Kostenlos" : (d.price_overview?.final_formatted ?? null),
+      originalPrice: d.price_overview?.discount_percent
+        ? (d.price_overview?.initial_formatted ?? null)
+        : null,
+      discountPercent: d.price_overview?.discount_percent ?? 0,
+    };
+  } catch {
+    return null;
+  }
 }

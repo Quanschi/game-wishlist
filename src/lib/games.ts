@@ -2,9 +2,15 @@ import { getDb } from "./db";
 import { getOtherUserId } from "./auth";
 import { getGgDealsUrls } from "./ggdeals";
 import { notifyAllUsers, notifyOtherUser } from "./push";
-import { getSteamPriceInfo, type SteamGameDetails } from "./steam";
+import {
+  getSteamDlcInfo,
+  getSteamDlcList,
+  getSteamPriceInfo,
+  type SteamGameDetails,
+} from "./steam";
 
 const PRICE_TTL_MS = 20 * 60 * 1000;
+const DLC_FETCH_LIMIT = 20;
 
 export type GameStatus =
   | "pending_add"
@@ -15,6 +21,16 @@ export type GameStatus =
   | "rejected";
 
 type ApprovalType = "add" | "complete" | "remove";
+
+export type GameDlc = {
+  appid: number;
+  title: string;
+  headerImage: string | null;
+  steamUrl: string | null;
+  price: string | null;
+  originalPrice: string | null;
+  discountPercent: number;
+};
 
 function pendingTypeOf(status: GameStatus): ApprovalType | null {
   if (status === "pending_add") return "add";
@@ -49,6 +65,7 @@ export type Game = {
   requestedAt: string;
   completedAt: string | null;
   approvals: { type: string; userId: string; decision: string }[];
+  dlcs: GameDlc[];
 };
 
 type GameRow = {
@@ -85,6 +102,11 @@ async function rowToGame(row: GameRow): Promise<Game> {
     sql: `SELECT type, user_id, decision FROM approvals WHERE game_id = ?`,
     args: [row.id],
   });
+  const dlcResult = await db.execute({
+    sql: `SELECT dlc_appid, title, header_image, steam_url, price, original_price, discount_percent
+          FROM game_dlcs WHERE game_id = ? ORDER BY sort_order`,
+    args: [row.id],
+  });
   return {
     id: row.id,
     steamAppid: row.steam_appid,
@@ -114,6 +136,15 @@ async function rowToGame(row: GameRow): Promise<Game> {
       type: r.type as string,
       userId: r.user_id as string,
       decision: r.decision as string,
+    })),
+    dlcs: dlcResult.rows.map((r) => ({
+      appid: r.dlc_appid as number,
+      title: r.title as string,
+      headerImage: r.header_image as string | null,
+      steamUrl: r.steam_url as string | null,
+      price: r.price as string | null,
+      originalPrice: r.original_price as string | null,
+      discountPercent: (r.discount_percent as number) ?? 0,
     })),
   };
 }
@@ -163,6 +194,8 @@ export async function createGameRequest(
   });
   const id = Number(result.rows[0].id);
 
+  await storeDlcsForGame(id, details.dlcAppIds);
+
   await db.execute({
     sql: `INSERT INTO approvals (game_id, type, user_id, decision) VALUES (?, 'add', ?, 'approved')`,
     args: [id, requestedBy],
@@ -179,6 +212,85 @@ export async function createGameRequest(
   return game;
 }
 
+async function storeDlcsForGame(gameId: number, dlcAppIds: number[]): Promise<void> {
+  const db = await getDb();
+  const capped = dlcAppIds.slice(0, DLC_FETCH_LIMIT);
+
+  const infos = await Promise.all(capped.map((appid) => getSteamDlcInfo(appid)));
+
+  await Promise.all(
+    infos.map(async (info, index) => {
+      if (!info) return;
+      await db.execute({
+        sql: `INSERT INTO game_dlcs (game_id, dlc_appid, title, header_image, steam_url, price, original_price, discount_percent, sort_order)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT(game_id, dlc_appid) DO UPDATE SET
+                title = excluded.title, header_image = excluded.header_image, steam_url = excluded.steam_url,
+                price = excluded.price, original_price = excluded.original_price, discount_percent = excluded.discount_percent`,
+        args: [
+          gameId,
+          info.appid,
+          info.title,
+          info.headerImage,
+          info.steamUrl,
+          info.price,
+          info.originalPrice,
+          info.discountPercent,
+          index,
+        ],
+      });
+    })
+  );
+
+  await db.execute({
+    sql: `UPDATE games SET dlc_checked = 1 WHERE id = ?`,
+    args: [gameId],
+  });
+}
+
+async function fillMissingDlcs(games: Game[]): Promise<Game[]> {
+  const db = await getDb();
+  const ids = games.map((g) => g.id);
+  if (ids.length === 0) return games;
+
+  const placeholders = ids.map(() => "?").join(",");
+  const res = await db.execute({
+    sql: `SELECT id, steam_appid FROM games WHERE dlc_checked = 0 AND steam_appid IS NOT NULL AND id IN (${placeholders})`,
+    args: ids,
+  });
+  const pending = res.rows.map((r) => ({
+    id: r.id as number,
+    steamAppid: r.steam_appid as number,
+  }));
+  if (pending.length === 0) return games;
+
+  await Promise.all(
+    pending.map(async (p) => {
+      const dlcAppIds = await getSteamDlcList(p.steamAppid);
+      await storeDlcsForGame(p.id, dlcAppIds);
+      const dlcRes = await db.execute({
+        sql: `SELECT dlc_appid, title, header_image, steam_url, price, original_price, discount_percent
+              FROM game_dlcs WHERE game_id = ? ORDER BY sort_order`,
+        args: [p.id],
+      });
+      const game = games.find((g) => g.id === p.id);
+      if (game) {
+        game.dlcs = dlcRes.rows.map((r) => ({
+          appid: r.dlc_appid as number,
+          title: r.title as string,
+          headerImage: r.header_image as string | null,
+          steamUrl: r.steam_url as string | null,
+          price: r.price as string | null,
+          originalPrice: r.original_price as string | null,
+          discountPercent: (r.discount_percent as number) ?? 0,
+        }));
+      }
+    })
+  );
+
+  return games;
+}
+
 export async function getGameById(id: number): Promise<Game | null> {
   const db = await getDb();
   const res = await db.execute({
@@ -189,7 +301,7 @@ export async function getGameById(id: number): Promise<Game | null> {
   const games = await refreshStalePrices([
     await rowToGame(res.rows[0] as unknown as GameRow),
   ]);
-  const [game] = await fillMissingGgDealsUrls(games);
+  const [game] = await fillMissingDlcs(await fillMissingGgDealsUrls(games));
   return game;
 }
 
@@ -240,6 +352,28 @@ async function refreshStalePrices(
           title: "🏷️ Sale!",
           body: `"${game.title}" ist gerade im Sale: -${newDiscount}% für ${info.price}`,
         });
+      }
+
+      if (game.dlcs.length > 0) {
+        await Promise.all(
+          game.dlcs.map(async (dlc) => {
+            const dlcInfo = await getSteamPriceInfo(dlc.appid);
+            if (!dlcInfo) return;
+            await db.execute({
+              sql: `UPDATE game_dlcs SET price = ?, original_price = ?, discount_percent = ? WHERE game_id = ? AND dlc_appid = ?`,
+              args: [
+                dlcInfo.price,
+                dlcInfo.originalPrice,
+                dlcInfo.discountPercent,
+                game.id,
+                dlc.appid,
+              ],
+            });
+            dlc.price = dlcInfo.price;
+            dlc.originalPrice = dlcInfo.originalPrice;
+            dlc.discountPercent = dlcInfo.discountPercent;
+          })
+        );
       }
     })
   );
@@ -308,9 +442,11 @@ export async function listGames(filter: {
   }
   sql += ` ORDER BY requested_at DESC`;
   const res = await db.execute({ sql, args });
-  const games = await fillMissingGgDealsUrls(
-    await refreshStalePrices(
-      await Promise.all(res.rows.map((r) => rowToGame(r as unknown as GameRow)))
+  const games = await fillMissingDlcs(
+    await fillMissingGgDealsUrls(
+      await refreshStalePrices(
+        await Promise.all(res.rows.map((r) => rowToGame(r as unknown as GameRow)))
+      )
     )
   );
   if (filter.tag) {
@@ -327,8 +463,10 @@ export async function listPendingForUser(userId: string): Promise<Game[]> {
     sql: `SELECT * FROM games WHERE status IN ('pending_add','pending_complete','pending_remove')`,
     args: [],
   });
-  const games = await fillMissingGgDealsUrls(
-    await Promise.all(res.rows.map((r) => rowToGame(r as unknown as GameRow)))
+  const games = await fillMissingDlcs(
+    await fillMissingGgDealsUrls(
+      await Promise.all(res.rows.map((r) => rowToGame(r as unknown as GameRow)))
+    )
   );
   return games.filter((g) => {
     const type = pendingTypeOf(g.status);
@@ -342,8 +480,10 @@ export async function listMyOpenRequests(userId: string): Promise<Game[]> {
     sql: `SELECT * FROM games WHERE status IN ('pending_add','pending_complete','pending_remove')`,
     args: [],
   });
-  const games = await fillMissingGgDealsUrls(
-    await Promise.all(res.rows.map((r) => rowToGame(r as unknown as GameRow)))
+  const games = await fillMissingDlcs(
+    await fillMissingGgDealsUrls(
+      await Promise.all(res.rows.map((r) => rowToGame(r as unknown as GameRow)))
+    )
   );
   return games.filter((g) => {
     const type = pendingTypeOf(g.status);

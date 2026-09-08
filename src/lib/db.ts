@@ -57,6 +57,22 @@ async function migrate(db: Client) {
     )
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS game_dlcs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      dlc_appid INTEGER NOT NULL,
+      title TEXT NOT NULL,
+      header_image TEXT,
+      steam_url TEXT,
+      price TEXT,
+      original_price TEXT,
+      discount_percent INTEGER NOT NULL DEFAULT 0,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(game_id, dlc_appid)
+    )
+  `);
+
   await db.execute(
     `CREATE INDEX IF NOT EXISTS idx_games_status ON games(status)`
   );
@@ -65,6 +81,9 @@ async function migrate(db: Client) {
   );
   await db.execute(
     `CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id)`
+  );
+  await db.execute(
+    `CREATE INDEX IF NOT EXISTS idx_game_dlcs_game ON game_dlcs(game_id)`
   );
 
   const columns = await db.execute(`PRAGMA table_info(games)`);
@@ -80,6 +99,7 @@ async function migrate(db: Client) {
     ["price_updated_at", "TEXT"],
     ["gg_deals_url", "TEXT"],
     ["gg_deals_checked", "INTEGER NOT NULL DEFAULT 0"],
+    ["dlc_checked", "INTEGER NOT NULL DEFAULT 0"],
   ];
   for (const [name, type] of reviewColumns) {
     if (!existing.has(name)) {

@@ -2,9 +2,51 @@
 
 import { useEffect, useState } from "react";
 import type { Game } from "@/lib/types";
+import type { GameDlc } from "@/lib/games";
 import { CheckIcon, ChevronDownIcon, XIcon } from "./icons";
 
+function DlcRow({ dlc }: { dlc: GameDlc }) {
+  return (
+    <a
+      href={dlc.steamUrl ?? undefined}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-3 rounded-lg bg-neutral-800/60 p-2 transition hover:bg-neutral-800"
+    >
+      <div className="flex h-10 w-20 shrink-0 items-center justify-center overflow-hidden rounded bg-neutral-900">
+        {dlc.headerImage && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={dlc.headerImage}
+            alt=""
+            className="h-full w-full object-contain"
+          />
+        )}
+      </div>
+      <span className="min-w-0 flex-1 truncate text-sm text-neutral-200">
+        {dlc.title}
+      </span>
+      <span className="flex shrink-0 items-center gap-1.5 text-xs">
+        {dlc.discountPercent > 0 && dlc.originalPrice ? (
+          <>
+            <span className="rounded bg-rose-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+              -{dlc.discountPercent}%
+            </span>
+            <span className="text-neutral-500 line-through">
+              {dlc.originalPrice}
+            </span>
+            <span className="font-medium text-emerald-400">{dlc.price}</span>
+          </>
+        ) : (
+          <span className="text-neutral-400">{dlc.price ?? "–"}</span>
+        )}
+      </span>
+    </a>
+  );
+}
+
 const MAIN_TAG_COUNT = 3;
+const DLC_PREVIEW_COUNT = 5;
 
 function reviewTone(percent: number | null): "positive" | "mixed" | "negative" {
   if (percent === null) return "mixed";
@@ -37,6 +79,7 @@ export function GameDetailModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [dlcsExpanded, setDlcsExpanded] = useState(false);
 
   const alreadyRequestedComplete = game.approvals.some(
     (a) => a.type === "complete" && a.userId === currentUserId
@@ -297,6 +340,41 @@ export function GameDetailModal({
             )}
             <span>Vorgeschlagen von: {game.requestedBy}</span>
           </div>
+
+          {game.dlcs.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-neutral-300">
+                DLCs ({game.dlcs.length})
+              </p>
+              <div className="space-y-1.5">
+                {game.dlcs.slice(0, DLC_PREVIEW_COUNT).map((dlc) => (
+                  <DlcRow key={dlc.appid} dlc={dlc} />
+                ))}
+              </div>
+              {game.dlcs.length > DLC_PREVIEW_COUNT && (
+                <>
+                  {dlcsExpanded && (
+                    <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
+                      {game.dlcs.slice(DLC_PREVIEW_COUNT).map((dlc) => (
+                        <DlcRow key={dlc.appid} dlc={dlc} />
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setDlcsExpanded((v) => !v)}
+                    className="flex items-center gap-1 rounded-full border border-neutral-700 px-2.5 py-1 text-xs text-neutral-400 transition hover:border-neutral-600 hover:text-neutral-200"
+                  >
+                    {dlcsExpanded
+                      ? "Weniger anzeigen"
+                      : `Mehr anzeigen (+${game.dlcs.length - DLC_PREVIEW_COUNT})`}
+                    <ChevronDownIcon
+                      className={`h-3 w-3 transition-transform ${dlcsExpanded ? "rotate-180" : ""}`}
+                    />
+                  </button>
+                </>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-2.5 pt-2">
             {game.steamUrl && (
