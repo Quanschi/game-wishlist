@@ -261,7 +261,9 @@ async function fillMissingGgDealsUrls(games: Game[]): Promise<Game[]> {
     id: r.id as number,
     steamAppid: r.steam_appid as number,
   }));
-  if (pending.length === 0) return games;
+  // Ohne Key gar nicht erst als "geprüft" markieren, sonst wird es nie
+  // nachgeholt, sobald der Key später konfiguriert wird.
+  if (pending.length === 0 || !process.env.GG_DEALS_API_KEY) return games;
 
   const urls = await getGgDealsUrls(pending.map((p) => p.steamAppid));
   await Promise.all(
